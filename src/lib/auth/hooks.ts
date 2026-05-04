@@ -17,7 +17,6 @@ export function useMe() {
     queryFn: authApi.fetchMe,
     staleTime: 5 * 60 * 1000,
     retry: false,
-    refetchOnWindowFocus: false,
   });
 }
 
