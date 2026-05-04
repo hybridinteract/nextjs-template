@@ -654,6 +654,7 @@ function cmdSetup() {
     "card",
     "badge",
     "dialog",
+    "alert-dialog",
     "dropdown-menu",
     "sheet",
     "table",
@@ -669,7 +670,9 @@ function cmdSetup() {
     "textarea",
     "popover",
     "command",
-    "toast",
+    "sonner",
+    "tooltip",
+    "radio-group",
   ];
 
   step("Installing shadcn/ui components (this may take a minute)…");
@@ -684,7 +687,7 @@ function cmdSetup() {
     ok("shadcn/ui components installed successfully.");
   } catch {
     err("shadcn setup failed. Try running manually:");
-    dim(`npx shadcn@latest add ${components.slice(0, 5).join(" ")} ...`);
+    dim(`npx shadcn@latest add --yes ${components.join(" ")}`);
     process.exit(1);
   }
 }
