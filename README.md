@@ -112,7 +112,7 @@ src/
 │   ├── loading/                   # Blocking loading system (useBlockingMutation)
 │   └── hooks/                     # Shared hooks (useTabState, useZustandTabSync)
 │
-├── middleware.ts                  # Route protection + API proxy auth injection
+├── proxy.ts                  # Route protection + API proxy auth injection
 └── types/
     └── index.ts                   # AppError, NavItem, global types
 ```
@@ -206,7 +206,7 @@ Authentication uses the **BFF (Backend-for-Frontend) pattern**:
 
 - Tokens are stored in **httpOnly cookies** — JavaScript never reads them
 - The `/api/auth/*` route handlers proxy auth to the backend and set cookies
-- `src/middleware.ts` injects `Authorization: Bearer <token>` for `/api/v1/*` routes
+- `src/proxy.ts` injects `Authorization: Bearer <token>` for `/api/v1/*` routes
 - On 401: `apiClient` auto-refreshes and retries once, then redirects to `/login`
 
 | Route | Method | Description |

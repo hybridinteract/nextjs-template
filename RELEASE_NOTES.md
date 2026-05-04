@@ -25,7 +25,7 @@ internal Hybrid Interactive projects.
 - **`lib/api-client.ts`** — Stateless singleton HTTP client: 401 auto-refresh with deduplication, FastAPI 422 error flattening, typed `get/post/patch/put/delete/upload`
 - **`components/layout/`** — `DashboardShell`: collapsible sidebar (desktop) + Sheet-based mobile nav, user dropdown, permission-gated nav items
 - **`components/shared/`** — Generic `DataTable`, `StatsCard`, `lazy.tsx` registry
-- **`middleware.ts`** — Route protection + API proxy auth injection
+- **`proxy.ts`** — Route protection + API proxy auth injection
 - **`ncube.js`** — CLI scaffolding tool (mirrors `fcube.py`)
 
 #### Base Roles

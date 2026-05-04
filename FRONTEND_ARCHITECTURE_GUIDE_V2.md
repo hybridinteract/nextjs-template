@@ -249,7 +249,7 @@ Middleware defines `PROTECTED_PREFIXES` (routes that require an `access_token` c
 2. **Route protection** — redirects to `/login?redirect=<original-path>` if no cookie.
 3. **Auth route guard** — redirects already-logged-in users away from `/login`.
 
-> **Rule:** When you add a new feature route, add its prefix to `PROTECTED_PREFIXES` in `middleware.ts`.
+> **Rule:** When you add a new feature route, add its prefix to `PROTECTED_PREFIXES` in `proxy.ts`.
 
 ---
 

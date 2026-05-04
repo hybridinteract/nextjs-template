@@ -9,7 +9,7 @@ const AUTH_ROUTES = ["/login", "/register", "/forgot-password"];
 // Post-login redirect default
 const DEFAULT_DASHBOARD = "/dashboard";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get("access_token")?.value;
 
