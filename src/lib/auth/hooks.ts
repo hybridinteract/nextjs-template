@@ -15,8 +15,9 @@ export function useMe() {
   return useQuery({
     queryKey: authKeys.me,
     queryFn: authApi.fetchMe,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     retry: false,
+    refetchOnWindowFocus: false,
   });
 }
 

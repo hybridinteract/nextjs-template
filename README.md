@@ -82,9 +82,10 @@ src/
 │   ├── (dashboard)/               # Authenticated pages — permission-gated
 │   │   ├── config.ts              # PermissionedNavItem[], ROUTES — NO JSX
 │   │   ├── layout.tsx             # Auth sync → Zustand, dashboard shell
-│   │   ├── loading.tsx            # Route skeleton
-│   │   ├── page.tsx               # Dashboard home
-│   │   └── <feature>/page.tsx    # One folder per feature
+│   │   └── dashboard/             # All authenticated routes live under /dashboard
+│   │       ├── loading.tsx        # Route skeleton
+│   │       ├── page.tsx           # Dashboard home → /dashboard
+│   │       └── <feature>/page.tsx # Feature pages → /dashboard/<feature>
 │   ├── api/
 │   │   └── auth/                  # BFF route handlers (manage httpOnly cookies)
 │   │       ├── login/route.ts
@@ -175,8 +176,8 @@ src/components/product/
 ├── product-form.tsx  # Dialog with create/edit/view modes
 └── index.ts          # Barrel exports
 
-src/app/(dashboard)/product/
-└── page.tsx          # Feature page
+src/app/(dashboard)/dashboard/product/
+└── page.tsx          # Feature page → /dashboard/product
 ```
 
 After running, follow the printed checklist to:

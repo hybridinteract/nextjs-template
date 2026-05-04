@@ -581,7 +581,7 @@ function cmdStartDomain(rawName) {
 
   const libDir = path.join(srcRoot, "lib", domainKebab);
   const compDir = path.join(srcRoot, "components", domainKebab);
-  const pageDir = path.join(srcRoot, "app", "(dashboard)", domainKebab);
+  const pageDir = path.join(srcRoot, "app", "(dashboard)", "dashboard", domainKebab);
 
   step(`Creating lib/${domainKebab}/`);
   writeFile(path.join(libDir, "types.ts"), generateTypesFile(Domain, domain, domainKebab));
@@ -596,7 +596,7 @@ function cmdStartDomain(rawName) {
   writeFile(path.join(compDir, `${domainKebab}-form.tsx`), generateFormComponent(Domain, domain, domainKebab));
   writeFile(path.join(compDir, "index.ts"), generateComponentIndexFile(Domain, domainKebab));
 
-  step(`Creating app/(dashboard)/${domainKebab}/`);
+  step(`Creating app/(dashboard)/dashboard/${domainKebab}/`);
   writeFile(path.join(pageDir, "page.tsx"), generatePageComponent(Domain, domainKebab));
 
   console.log("");
