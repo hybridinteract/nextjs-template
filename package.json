@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "setup": "node ncube.js setup"
+    "setup": "node ncube.js setup",
+    "init": "node ncube.js init"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

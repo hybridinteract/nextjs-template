@@ -29,46 +29,66 @@ A production-ready, opinionated Next.js frontend template by Hybrid Interactive.
 
 ## Quick Start
 
-### 1. Clone or create from template
+### 1. Create your repo from the template
+
+Click **"Use this template"** on GitHub → **"Create a new repository"** → name your repo → click **"Create repository"**.
+
+> First time? Go to the [template repo](https://github.com/hybridinteractive/nextjs-template) and click the green **"Use this template"** button.
+
+### 2. Clone and enter the repo
 
 ```bash
-# Option A: clone directly
-git clone <repo-url> my-project
-cd my-project
-
-# Option B: bootstrap from template CLI (from the nextjs-template directory)
-node ncube.js create my-project --variant rbac
-cd ../my-project
+git clone https://github.com/<your-org>/<your-repo>.git
+cd <your-repo>
 ```
 
-### 2. Install dependencies
+### 3. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Set up environment
+### 4. Run the init command
 
 ```bash
-cp .env.example .env
-# Edit .env — at minimum set NEXT_PUBLIC_API_URL
+node ncube.js init          # or: node ncube.js init my-app-name
 ```
 
-### 4. Install shadcn/ui components
+This does three things in one step:
+- Sets the project name in `package.json`
+- Creates `.env` from `.env.example` (with your app name pre-filled)
+- Installs all shadcn/ui components into `src/components/ui/`
+
+### 5. Configure your backend URL
 
 ```bash
-node ncube.js setup
-# or manually:
-npx shadcn@latest add button input label card badge dialog dropdown-menu sheet table tabs skeleton avatar separator scroll-area form select checkbox switch textarea popover command
+# Edit .env — at minimum set:
+NEXT_PUBLIC_API_URL="http://localhost:8000"
 ```
 
-### 5. Start development server
+### 6. Start the development server
 
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+### Legacy: bootstrap from a local clone
+
+If you prefer to work from a local copy of the template instead of GitHub's "Use this template":
+
+```bash
+# From inside the nextjs-template directory:
+node ncube.js create my-app [--variant base|rbac|full]
+cd ../my-app
+npm install
+npm run dev
+```
+
+> `create` is deprecated in favour of the template flow above. It still works but will show a notice.
 
 ---
 
@@ -122,19 +142,15 @@ src/
 
 ## Variants
 
-Three variants are available via the CLI:
+When you use **"Use this template"** on GitHub, you always get the **full** variant — everything included. No selection needed.
 
-| Variant | Includes | Use when |
-|---------|----------|----------|
-| `base` | Auth, layout shell, no RBAC | Simple internal tools, single-role apps |
-| `rbac` *(default)* | Base + full permissions/RBAC system | Most SaaS apps, multi-role dashboards |
-| `full` | RBAC + access-control admin panel | Platforms with custom role management |
+| Variant | Includes | How to get it |
+|---------|----------|---------------|
+| `full` *(default via template)* | Auth + full RBAC + access-control admin panel | Use GitHub "Use this template" |
+| `rbac` | Auth + full RBAC, no admin panel | Use template → delete `src/app/(dashboard)/access-control/` |
+| `base` | Auth + layout shell, no RBAC | Use template → delete `src/lib/permissions/` and `src/app/(dashboard)/access-control/` |
 
-```bash
-node ncube.js create my-app --variant base
-node ncube.js create my-app --variant rbac   # default
-node ncube.js create my-app --variant full
-```
+> For local bootstrapping (deprecated), the `create` command still supports `--variant base|rbac|full`.
 
 ---
 
@@ -143,6 +159,9 @@ node ncube.js create my-app --variant full
 The `ncube.js` CLI mirrors the FastAPI `fcube.py` module generator. It scaffolds complete feature domains following the architecture conventions.
 
 ```bash
+# Post-clone setup (name, .env, shadcn) — run once after cloning
+node ncube.js init [my-app-name]
+
 # Scaffold a new domain
 node ncube.js startdomain Product
 node ncube.js startdomain LeadManagement
@@ -151,10 +170,10 @@ node ncube.js startdomain InvoiceItem
 # List existing domains
 node ncube.js listdomains
 
-# Install shadcn/ui components
+# Install shadcn/ui components (included in init, but can run standalone)
 node ncube.js setup
 
-# Bootstrap a new project
+# (Deprecated) Bootstrap locally from the template directory
 node ncube.js create my-app [--variant base|rbac|full]
 ```
 

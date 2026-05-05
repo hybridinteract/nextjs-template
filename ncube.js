@@ -5,11 +5,12 @@
  * Mirrors the FastAPI fcube.py module generator for frontend domains.
  *
  * Commands:
+ *   node ncube.js init [name]                — post-clone setup (name, .env, shadcn)
  *   node ncube.js startdomain <DomainName>   — scaffold a new feature domain
  *   node ncube.js listdomains                — list existing domains in lib/
  *   node ncube.js setup                      — install shadcn/ui components
  *   node ncube.js create <name> [--variant base|rbac|full]
- *                                            — bootstrap a new project from this template
+ *                                            — (deprecated) bootstrap from local template
  */
 
 const fs = require("fs");
@@ -692,7 +693,98 @@ function cmdSetup() {
   }
 }
 
+function cmdInit(rawArgs) {
+  // Determine app name
+  // Priority: positional arg → --name flag → current directory name
+  const nameFlag = rawArgs.indexOf("--name");
+  let appName;
+  if (nameFlag !== -1 && rawArgs[nameFlag + 1]) {
+    appName = toKebabCase(rawArgs[nameFlag + 1]);
+  } else {
+    const positional = rawArgs.find((a) => !a.startsWith("--"));
+    appName = positional
+      ? toKebabCase(positional)
+      : path.basename(process.cwd());
+  }
+
+  header(`Initializing project: ${appName}`);
+
+  // 1. Update package.json name
+  const pkgPath = path.join(process.cwd(), "package.json");
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    const oldName = pkg.name;
+    if (oldName !== appName) {
+      pkg.name = appName;
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+      ok(`package.json name: ${c.dim}${oldName}${c.reset} → ${c.green}${appName}${c.reset}`);
+    } else {
+      ok(`package.json name: ${appName} (already set)`);
+    }
+  }
+
+  // 2. Create .env from .env.example if not already present
+  const envExamplePath = path.join(process.cwd(), ".env.example");
+  const envPath = path.join(process.cwd(), ".env");
+  if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
+    let envContent = fs.readFileSync(envExamplePath, "utf8");
+    envContent = envContent.replace(
+      /^NEXT_PUBLIC_APP_NAME=.*$/m,
+      `NEXT_PUBLIC_APP_NAME="${appName}"`,
+    );
+    fs.writeFileSync(envPath, envContent);
+    ok("Created .env from .env.example");
+  } else if (fs.existsSync(envPath)) {
+    info(".env already exists — skipping");
+  } else {
+    warn(".env.example not found — skipping .env creation");
+  }
+
+  // 3. Install shadcn components if src/components/ui/ is missing or empty
+  const hasSrc = fs.existsSync(path.join(process.cwd(), "src"));
+  const uiDir = hasSrc
+    ? path.join(process.cwd(), "src", "components", "ui")
+    : path.join(process.cwd(), "components", "ui");
+  const needsSetup =
+    !fs.existsSync(uiDir) || fs.readdirSync(uiDir).length === 0;
+
+  if (needsSetup) {
+    cmdSetup();
+  } else {
+    ok("shadcn/ui components already installed — skipping setup");
+  }
+
+  console.log("");
+  header("You're ready!");
+  dim("Next steps:");
+  dim("  1. Edit .env — set NEXT_PUBLIC_API_URL to your backend URL");
+  dim("  2. npm run dev");
+  console.log("");
+  info("Add feature domains with:  node ncube.js startdomain <Name>");
+  console.log("");
+}
+
 function cmdCreate(projectName, variant) {
+  // ── Deprecation notice ────────────────────────────────────────────────────────
+  console.log("");
+  console.log(`${c.yellow}${c.bold}⚠  Deprecation notice${c.reset}`);
+  console.log(
+    `${c.dim}  'create' is no longer the recommended way to start a project.${c.reset}`,
+  );
+  console.log(
+    `${c.dim}  Use GitHub's "Use this template" button instead:${c.reset}`,
+  );
+  console.log(
+    `${c.dim}    1. Click "Use this template" on GitHub → name your repo${c.reset}`,
+  );
+  console.log(
+    `${c.dim}    2. git clone <your-repo> && cd <your-repo>${c.reset}`,
+  );
+  console.log(`${c.dim}    3. npm install && node ncube.js init${c.reset}`);
+  console.log(`${c.dim}  Continuing with local 'create' anyway…${c.reset}`);
+  console.log("");
+  // ─────────────────────────────────────────────────────────────────────────────
+
   if (!projectName) {
     err("Usage: node ncube.js create <project-name> [--variant base|rbac|full]");
     process.exit(1);
@@ -886,23 +978,27 @@ function main() {
 ${c.bold}${c.blue}NCube CLI${c.reset} — Next.js scaffolding tool
 
 ${c.bold}Commands:${c.reset}
+  ${c.cyan}init${c.reset} [name]                           Post-clone setup: name, .env, shadcn
   ${c.cyan}startdomain${c.reset} <DomainName>              Scaffold a new feature domain
   ${c.cyan}listdomains${c.reset}                           List existing domains
   ${c.cyan}setup${c.reset}                                 Install shadcn/ui components
-  ${c.cyan}create${c.reset} <name> [--variant base|rbac|full]  Bootstrap a new project
+  ${c.cyan}create${c.reset} <name> [--variant base|rbac|full]  ${c.dim}(deprecated)${c.reset} Bootstrap locally
   ${c.cyan}bump${c.reset} <patch|minor|major>              Bump version + add changelog entry
 
 ${c.bold}Examples:${c.reset}
+  node ncube.js init my-saas
   node ncube.js startdomain Product
   node ncube.js listdomains
   node ncube.js setup
-  node ncube.js create my-saas --variant rbac
   node ncube.js bump minor
 `);
     return;
   }
 
   switch (command) {
+    case "init":
+      cmdInit(rest);
+      break;
     case "startdomain":
       cmdStartDomain(rest[0]);
       break;
