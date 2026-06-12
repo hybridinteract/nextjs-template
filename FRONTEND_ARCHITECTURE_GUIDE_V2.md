@@ -1023,7 +1023,7 @@ A full RBAC (Role-Based Access Control) system:
 
 | File          | Purpose                                                   |
 | ------------- | --------------------------------------------------------- |
-| `config.ts`   | `ROLE_PERMISSIONS` map, `ROLES` metadata, `ROLE_DASHBOARD_MAP` |
+| `config.ts`   | `ROLES` metadata, `ROLE_DASHBOARD_MAP`, `ROLE_LABELS`, `ROLE_COLORS` |
 | `types.ts`    | `BuiltinUserRole`, `UserRole`, `Permission` (~80 keys), `PermissionedNavItem` |
 | `helpers.ts`  | `hasPermission()`, `hasAnyPermission()`, `hasAllPermissions()`, `getNavItemsForRole()` |
 | `hooks.ts`    | `usePermission(perm)`, `useAnyPermission(perms)`, `useFilteredNavItems(items)` |

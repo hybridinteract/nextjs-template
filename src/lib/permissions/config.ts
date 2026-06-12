@@ -1,31 +1,5 @@
 import type { BuiltinUserRole, Permission } from "./types";
 
-// ── Role → Permission mapping ──────────────────────────────────────────────────
-// super_admin gets [] here because hasPermission() short-circuits for super_admin.
-export const ROLE_PERMISSIONS: Record<BuiltinUserRole, Permission[]> = {
-  super_admin: [],
-  admin: [
-    "users.view",
-    "users.manage",
-    "users.delete",
-    "roles.manage",
-    "settings.view",
-    "settings.manage",
-    "content.view",
-    "content.create",
-    "content.edit",
-    "content.delete",
-  ],
-  member: [
-    "content.view",
-    "content.create",
-    "content.edit",
-  ],
-  viewer: [
-    "content.view",
-  ],
-};
-
 // ── Role display metadata ──────────────────────────────────────────────────────
 export const ROLE_LABELS: Record<BuiltinUserRole, string> = {
   super_admin: "Super Admin",
