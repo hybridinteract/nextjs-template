@@ -35,18 +35,25 @@ interface DashboardShellProps {
   moduleTitle?: string;
 }
 
-export function DashboardShell({
+/**
+ * Defined at module scope, not inside `DashboardShell`.
+ *
+ * A component created during render is a brand-new type on every render, so React
+ * unmounts and remounts the whole nav each time — losing scroll position and focus,
+ * and throwing away any state inside it. `react-hooks/static-components` catches it.
+ */
+function NavLinks({
   navItems,
-  children,
-  moduleTitle = process.env.NEXT_PUBLIC_APP_NAME ?? "My App",
-}: DashboardShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
-  const { mutate: logout } = useLogout();
-
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
+  pathname,
+  collapsed,
+  onNavigate,
+}: {
+  navItems: PermissionedNavItem[];
+  pathname: string;
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
     <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
       {navItems.map((item) => {
         const isActive =
@@ -80,6 +87,18 @@ export function DashboardShell({
       })}
     </nav>
   );
+}
+
+export function DashboardShell({
+  navItems,
+  children,
+  moduleTitle = process.env.NEXT_PUBLIC_APP_NAME ?? "My App",
+}: DashboardShellProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const { mutate: logout } = useLogout();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -116,7 +135,7 @@ export function DashboardShell({
           </Button>
         </div>
 
-        <NavLinks />
+        <NavLinks navItems={navItems} pathname={pathname} collapsed={collapsed} />
 
         {/* User footer */}
         {user && (
@@ -178,7 +197,12 @@ export function DashboardShell({
                   {moduleTitle}
                 </span>
               </div>
-              <NavLinks onNavigate={() => setMobileOpen(false)} />
+              <NavLinks
+                navItems={navItems}
+                pathname={pathname}
+                collapsed={false}
+                onNavigate={() => setMobileOpen(false)}
+              />
             </SheetContent>
           </Sheet>
           <span className="text-sm font-semibold">{moduleTitle}</span>

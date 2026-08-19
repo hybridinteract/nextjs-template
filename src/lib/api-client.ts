@@ -2,20 +2,43 @@ import { AppError } from "@/types";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RequestOptions {
-  params?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Query params. An array value becomes a **repeated** param (`?ids=a&ids=b`),
+   * which is what FastAPI parses back into a list — a comma-joined single value
+   * would arrive as one malformed string and 422.
+   */
+  params?: Record<
+    string,
+    string | number | boolean | readonly string[] | readonly number[] | undefined
+  >;
   headers?: Record<string, string>;
   fetchOptions?: RequestInit;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function buildUrl(path: string, params?: RequestOptions["params"]): string {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+  // Browser requests MUST be same-origin so the Next.js proxy (proxy.ts) can
+  // inject the Authorization header from the httpOnly cookie. NEXT_PUBLIC_API_URL
+  // is only for server-side BFF route handlers that talk to the backend directly.
+  //
+  // Pointing this at the backend origin instead is the bug this comment exists to
+  // stop: the cookies live on the Next.js origin, so a cross-origin call carries
+  // no credentials and every authenticated request 401s.
+  const base =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : (process.env.NEXT_PUBLIC_API_URL ?? "");
   const url = new URL(path.startsWith("http") ? path : `${base}${path}`);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        url.searchParams.set(k, String(v));
+      if (v === undefined || v === null) return;
+      if (Array.isArray(v)) {
+        // Repeated, not comma-joined — see the `params` doc comment above. An
+        // empty array contributes nothing rather than an empty `?k=`.
+        v.forEach((item) => url.searchParams.append(k, String(item)));
+        return;
       }
+      url.searchParams.set(k, String(v));
     });
   }
   return url.toString();

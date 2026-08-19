@@ -71,7 +71,7 @@ function toCamelCase(str) {
 }
 
 // ── Domain template generators ─────────────────────────────────────────────────
-function generateTypesFile(Domain, domain, domainKebab) {
+function generateTypesFile(Domain, domain, _domainKebab) {
   return `import { z } from "zod";
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ export type ${Domain}FormValues = z.infer<typeof ${domain}FormSchema>;
 `;
 }
 
-function generateTransformersFile(Domain, domain) {
+function generateTransformersFile(Domain, _domain) {
   return `import type { Backend${Domain}, ${Domain}, ${Domain}FormValues } from "./types";
 
 export function transform${Domain}(raw: Backend${Domain}): ${Domain} {
@@ -301,7 +301,7 @@ export function useDelete${Domain}() {
 `;
 }
 
-function generateStoreFile(Domain, domain) {
+function generateStoreFile(Domain, _domain) {
   return `"use client";
 
 import { create } from "zustand";

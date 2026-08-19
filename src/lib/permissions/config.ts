@@ -1,4 +1,4 @@
-import type { BuiltinUserRole, Permission } from "./types";
+import type { BuiltinUserRole } from "./types";
 
 // ── Role display metadata ──────────────────────────────────────────────────────
 export const ROLE_LABELS: Record<BuiltinUserRole, string> = {
