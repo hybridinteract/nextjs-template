@@ -14,7 +14,7 @@ and the cross-cutting docs at `phoenix-backend/docs/concerns/`.
 
 ---
 
-## Phase 0 — Make the template work
+## Phase 0 — Make the template work  ✅ done 19 Aug 2026
 
 The template's authenticated API calls do not work as shipped. Two files cause it.
 
@@ -34,7 +34,7 @@ and comes back 200.
 
 ---
 
-## Phase 1 — The shared systems
+## Phase 1 — The shared systems  ✅ done 19 Aug 2026
 
 ### 1.1 DataView — the list system
 
@@ -159,6 +159,18 @@ pass. The template's current shell works. Do this last.
 
 Also port: `NavItem.group` (sidebar section headings) and `subItems`, from
 `phoenix-frontend/src/types/index.ts`.
+
+### What changed against this plan
+
+Three things came out differently once the code was in front of me:
+
+- **shadcn/ui is now committed.** A fresh clone could not type-check or build, so CI was red.
+  `ncube setup` stays as a refresh command.
+- **DataView needed a fourth state.** `isLoading` is false from the first render when a hook uses
+  `placeholderData`, so a slow or retrying list flashed the empty state. It takes `isPending` now.
+- **Two bugs came across with the port and were fixed here**, both still live in Phoenix: the
+  Modal never unmounted (framer-motion's `onAnimationComplete` does not fire), and 28 lint
+  problems Phoenix carries as a baseline. The template is lint-clean.
 
 ---
 
