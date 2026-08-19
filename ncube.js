@@ -9,6 +9,8 @@
  *   node ncube.js startdomain <DomainName>   — scaffold a new feature domain
  *   node ncube.js listdomains                — list existing domains in lib/
  *   node ncube.js setup                      — install shadcn/ui components
+ *   node ncube.js remove <feature>           — strip an optional subsystem cleanly
+ *   node ncube.js bump <patch|minor|major>   — version + changelog entry
  *   node ncube.js create <name> [--variant base|rbac|full]
  *                                            — (deprecated) bootstrap from local template
  */
@@ -969,6 +971,470 @@ function cmdBump(bumpType) {
   console.log("");
 }
 
+// ── Removable features ─────────────────────────────────────────────────────────
+//
+// A template ships things a given project will not need, and dead code is worse
+// than absent code: it gets read, maintained and copied. Each entry below says
+// exactly what one feature is made of, so `node ncube.js remove <name>` can take
+// it out cleanly — and so `docs/OPTIONAL_PARTS.md` can be generated from the same
+// data instead of drifting from it.
+//
+// `edits` use EXACT string matches on purpose. If a file has been changed since
+// the template shipped, the match fails, the command stops, and it tells you to
+// finish by hand — which is the honest outcome. A regex that "mostly" matches
+// would silently mangle the file instead.
+const REMOVABLE = {
+  permissions: {
+    label: "Permissions / RBAC",
+    summary: "Role-based gating of nav items and buttons.",
+    keeps:
+      "Auth still works. Everyone who is signed in sees every nav item, and the backend remains the real guard.",
+    when: "Your app has no roles, or a single role, and the backend gates everything.",
+    files: ["src/lib/permissions"],
+    deps: [],
+    docs: ["docs/rules/06-permissions.md"],
+    edits: [
+      {
+        file: "src/app/(dashboard)/layout.tsx",
+        find: 'import { useRoleStore, useFilteredNavItems } from "@/lib/permissions";\n',
+        replace: "",
+      },
+      {
+        file: "src/app/(dashboard)/layout.tsx",
+        find:
+          "  const { setRole, setIsSuperuser, setEffectivePermissions } = useRoleStore();\n" +
+          "  const navItems = useFilteredNavItems(dashboardNavItems);",
+        replace: "  const navItems = dashboardNavItems;",
+      },
+      {
+        file: "src/app/(dashboard)/layout.tsx",
+        find:
+          "  useEffect(() => {\n" +
+          "    if (user) {\n" +
+          "      setUser(user);\n" +
+          "      setRole(user.role);\n" +
+          "      setIsSuperuser(user.isSuperuser);\n" +
+          "      setEffectivePermissions(user.effectivePermissions);\n" +
+          "    }\n" +
+          "  }, [user, setUser, setRole, setIsSuperuser, setEffectivePermissions]);",
+        replace:
+          "  useEffect(() => {\n" +
+          "    if (user) setUser(user);\n" +
+          "  }, [user, setUser]);",
+      },
+      {
+        file: "src/app/(dashboard)/config.ts",
+        find: 'import type { PermissionedNavItem } from "@/lib/permissions";',
+        replace: 'import type { NavItem } from "@/types";',
+      },
+      {
+        file: "src/app/(dashboard)/config.ts",
+        find: "export const dashboardNavItems: PermissionedNavItem[] = [",
+        replace: "export const dashboardNavItems: NavItem[] = [",
+      },
+      {
+        file: "src/app/(dashboard)/config.ts",
+        find:
+          "// ── Navigation items ────────────────────────────────────────────────────────\n" +
+          "// Add permission/permissions to gate visibility by role.\n" +
+          "// Leave both undefined to show to all authenticated users.",
+        replace:
+          "// ── Navigation items ────────────────────────────────────────────────────────\n" +
+          "// Every signed-in user sees every item (permission gating was removed).",
+      },
+    ],
+    // Nav entries keep no dead `permission:` keys behind.
+    strip: [{ file: "src/app/(dashboard)/config.ts", pattern: /^\s*permissions?: .*\n/gm }],
+  },
+
+  numeric: {
+    label: "Decimal money & quantities (big.js)",
+    summary: "String-based money and quantity maths, and their formatters.",
+    keeps: "Everything else. Dates are a separate module and stay.",
+    when: "Your app shows no money, no decimals, and no quantities.",
+    files: ["src/lib/numeric"],
+    deps: ["big.js", "@types/big.js"],
+    docs: [],
+    edits: [
+      {
+        file: "eslint.config.mjs",
+        find: '    ignores: ["src/lib/date-utils.ts", "src/lib/numeric/**"],',
+        replace: '    ignores: ["src/lib/date-utils.ts"],',
+      },
+      {
+        file: "src/lib/utils.ts",
+        find:
+          "// formatCurrency() and formatNumber() used to live here. They are gone on purpose:\n" +
+          "// both took a `locale` argument and did float math on money. Use\n" +
+          "// `formatMoney` / `formatQuantity` from `@/lib/numeric`, which pin one locale and\n" +
+          "// keep money as a decimal string. See that module's comments for why.\n\n",
+        replace: "",
+      },
+    ],
+    note:
+      "The Intl.NumberFormat lint rules stay. If you now format numbers by hand, delete the two NumberFormat selectors in eslint.config.mjs — and read docs/rules/12 first, because the browser-locale trap they prevent is real either way.",
+  },
+
+  reference: {
+    label: "Reference pickers",
+    summary: "Ungated dropdown feeds and the shared <ReferencePicker>.",
+    keeps: "<SearchableSelect> stays — it is the combobox underneath, and useful on its own.",
+    when: "Your backend has no /<resource>/options routes and you are not adding them.",
+    files: ["src/lib/reference", "src/components/shared/reference-picker.tsx"],
+    deps: [],
+    docs: ["docs/rules/13-reference-data.md"],
+    edits: [
+      {
+        file: "src/components/shared/index.ts",
+        find: 'export { ReferencePicker } from "./reference-picker";\n',
+        replace: "",
+      },
+    ],
+    note:
+      "Read docs/rules/13 before removing this. The permission trap it exists to prevent — a dropdown fed from a gated module list, silently empty for the people who need it — comes back the moment you write your own picker.",
+  },
+
+  "blocking-loading": {
+    label: "Blocking loading overlay",
+    summary: "useBlockingMutation and the full-screen overlay it drives.",
+    keeps: "Mutations still work. You handle pending state per component instead.",
+    when: "You prefer inline pending states on buttons to a global overlay.",
+    files: ["src/lib/loading", "src/components/loading"],
+    deps: [],
+    docs: [],
+    edits: [
+      {
+        file: "src/app/layout.tsx",
+        find: 'import { GlobalLoadingOverlay } from "@/components/loading/global-loading-overlay";\n',
+        replace: "",
+      },
+      {
+        file: "src/app/layout.tsx",
+        find: "            <GlobalLoadingOverlay />\n",
+        replace: "",
+      },
+      {
+        file: "src/lib/auth/hooks.ts",
+        find: 'import { useBlockingMutation } from "@/lib/loading";\n',
+        replace: "",
+      },
+      {
+        file: "src/lib/auth/hooks.ts",
+        find: "  return useBlockingMutation(\n    {\n      mutationFn: authApi.logout,",
+        replace: "  return useMutation({\n      mutationFn: authApi.logout,",
+      },
+      {
+        file: "src/lib/auth/hooks.ts",
+        find: '    },\n    { source: "auth", label: "Signing out…" },\n  );\n}',
+        replace: "  });\n}",
+      },
+    ],
+    note:
+      "Every generated mutation hook uses useBlockingMutation. After removing this, `ncube startdomain` output will not compile until you switch those to useMutation.",
+  },
+
+  "data-view": {
+    label: "DataView (the list system)",
+    summary:
+      "URL-synced search, filters, sort, pagination, row selection and bulk actions.",
+    keeps: "<DataTable> stays — you would render it yourself and own the state.",
+    when: "Your app is not list-driven. Think hard: this is most of the template's value.",
+    files: ["src/components/data-view"],
+    deps: [],
+    docs: ["docs/rules/07-list-pages.md"],
+    edits: [],
+    note:
+      "Removing this means hand-rolling page/search/filter state, which docs/rules/07 exists to talk you out of. Read it first.",
+  },
+
+  "dark-mode": {
+    label: "Dark mode",
+    summary: "next-themes and the theme-aware toast surface.",
+    keeps:
+      "The .dark token block stays in globals.css — harmless, and it means re-adding dark mode later is one provider.",
+    when: "The product is light-only by design.",
+    files: [],
+    deps: ["next-themes"],
+    docs: [],
+    edits: [
+      {
+        file: "src/app/layout.tsx",
+        find: 'import { ThemeProvider } from "next-themes";\n',
+        replace: "",
+      },
+      {
+        file: "src/app/layout.tsx",
+        find:
+          "          <ThemeProvider\n" +
+          '            attribute="class"\n' +
+          '            defaultTheme="light"\n' +
+          "            enableSystem\n" +
+          "            disableTransitionOnChange\n" +
+          "          >\n",
+        replace: "",
+      },
+      {
+        file: "src/app/layout.tsx",
+        find: "          </ThemeProvider>\n",
+        replace: "",
+      },
+      {
+        file: "src/components/ui/sonner.tsx",
+        find: 'import { useTheme } from "next-themes"\n',
+        replace: "",
+      },
+      {
+        file: "src/components/ui/sonner.tsx",
+        find: '  const { theme = "system" } = useTheme()\n\n  return (\n    <Sonner\n      theme={theme as ToasterProps["theme"]}\n',
+        replace: "  return (\n    <Sonner\n",
+      },
+    ],
+  },
+};
+
+function rmrf(target) {
+  if (!fs.existsSync(target)) return false;
+  fs.rmSync(target, { recursive: true, force: true });
+  return true;
+}
+
+/** Strip a dependency from package.json, wherever it is declared. */
+function removeDep(pkg, name) {
+  let found = false;
+  for (const section of ["dependencies", "devDependencies"]) {
+    if (pkg[section] && pkg[section][name] !== undefined) {
+      delete pkg[section][name];
+      found = true;
+    }
+  }
+  return found;
+}
+
+function cmdRemoveList() {
+  header("Removable features");
+  console.log(
+    `  ${c.dim}Each of these is optional. Remove what your project does not need —${c.reset}`,
+  );
+  console.log(
+    `  ${c.dim}dead code still gets read, maintained and copied.${c.reset}\n`,
+  );
+  for (const [key, f] of Object.entries(REMOVABLE)) {
+    console.log(`  ${c.bold}${key}${c.reset}  ${c.dim}—${c.reset} ${f.label}`);
+    console.log(`    ${c.dim}${f.summary}${c.reset}`);
+    console.log(`    ${c.dim}Remove when: ${f.when}${c.reset}\n`);
+  }
+  dim("Usage:  node ncube.js remove <name> [--dry-run]");
+  dim("Docs:   docs/OPTIONAL_PARTS.md");
+  console.log("");
+}
+
+function cmdRemove(name, flags) {
+  if (!name || name === "--list") return cmdRemoveList();
+
+  const feature = REMOVABLE[name];
+  if (!feature) {
+    err(`Unknown feature: ${name}`);
+    dim(`Known: ${Object.keys(REMOVABLE).join(", ")}`);
+    dim("Run `node ncube.js remove --list` for what each one is.");
+    process.exit(1);
+  }
+
+  const dry = flags.includes("--dry-run");
+  header(`${dry ? "Dry run — " : ""}Removing: ${feature.label}`);
+  console.log(`  ${c.dim}${feature.summary}${c.reset}`);
+  console.log(`  ${c.dim}Keeps: ${feature.keeps}${c.reset}\n`);
+
+  // ── Verify every edit still matches before changing anything. ──────────────
+  // Half-applied removals are the failure mode worth designing against: the
+  // build breaks and it is not obvious which of ten edits landed.
+  const problems = [];
+  for (const edit of feature.edits ?? []) {
+    const p = path.join(process.cwd(), edit.file);
+    if (!fs.existsSync(p)) {
+      problems.push(`${edit.file} — file not found`);
+    } else if (!fs.readFileSync(p, "utf8").includes(edit.find)) {
+      problems.push(`${edit.file} — expected text not found (file was modified?)`);
+    }
+  }
+  if (problems.length) {
+    err("Cannot remove cleanly. These files no longer match the template:");
+    problems.forEach((p) => dim(`  ${p}`));
+    console.log("");
+    warn("Nothing was changed. Remove this feature by hand — docs/OPTIONAL_PARTS.md");
+    dim("lists every file and edit involved.");
+    process.exit(1);
+  }
+
+  // ── Apply ─────────────────────────────────────────────────────────────────
+  for (const target of feature.files ?? []) {
+    if (dry) { info(`would delete  ${target}`); continue; }
+    if (rmrf(path.join(process.cwd(), target))) ok(`deleted  ${target}`);
+  }
+
+  for (const doc of feature.docs ?? []) {
+    if (dry) { info(`would delete  ${doc}`); continue; }
+    if (rmrf(path.join(process.cwd(), doc))) {
+      ok(`deleted  ${doc}`);
+      // Keep the rules index honest.
+      const idx = path.join(process.cwd(), "docs/rules/README.md");
+      if (fs.existsSync(idx)) {
+        const base = path.basename(doc);
+        const kept = fs
+          .readFileSync(idx, "utf8")
+          .split("\n")
+          .filter((line) => !line.includes(base))
+          .join("\n");
+        fs.writeFileSync(idx, kept);
+        ok(`updated  docs/rules/README.md`);
+      }
+    }
+  }
+
+  for (const edit of feature.edits ?? []) {
+    if (dry) { info(`would edit    ${edit.file}`); continue; }
+    const p = path.join(process.cwd(), edit.file);
+    fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(edit.find, edit.replace));
+    ok(`edited   ${edit.file}`);
+  }
+
+  for (const s of feature.strip ?? []) {
+    if (dry) { info(`would strip   ${s.file}`); continue; }
+    const p = path.join(process.cwd(), s.file);
+    fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(s.pattern, ""));
+    ok(`stripped ${s.file}`);
+  }
+
+  if ((feature.deps ?? []).length) {
+    const pkgPath = path.join(process.cwd(), "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    const dropped = feature.deps.filter((d) => removeDep(pkg, d));
+    if (dry) {
+      dropped.forEach((d) => info(`would drop    ${d}`));
+    } else if (dropped.length) {
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+      dropped.forEach((d) => ok(`dropped  ${d} from package.json`));
+      warn("Run `npm install` to update the lockfile.");
+    }
+  }
+
+  if (dry) {
+    console.log("");
+    info("Dry run — nothing was changed.");
+    return;
+  }
+
+  if (feature.note) {
+    console.log("");
+    warn(feature.note);
+  }
+
+  // ── Prove it ──────────────────────────────────────────────────────────────
+  // A removal that leaves the project broken is worse than no command at all,
+  // so this reports honestly rather than claiming success.
+  console.log("");
+  step("Checking the project still compiles…");
+  try {
+    execSync("npx tsc --noEmit", { stdio: "pipe", cwd: process.cwd() });
+    ok("type-check passed.");
+    console.log("");
+    dim("Next: npm run lint && npm run build");
+  } catch (e) {
+    console.log("");
+    warn("type-check failed. What is left refers to the feature you removed:");
+    console.log("");
+    console.log(String(e.stdout ?? e.message).trim());
+    console.log("");
+    dim("Fix those references, then re-run `npm run type-check`.");
+    dim("To undo the whole removal: git checkout -- . && git clean -fd");
+  }
+}
+
+/** Regenerate docs/OPTIONAL_PARTS.md from REMOVABLE, so the two cannot drift. */
+function cmdRemoveDocs() {
+  const lines = [];
+  lines.push("# Optional parts");
+  lines.push("");
+  lines.push("> Generated from the `REMOVABLE` manifest in `ncube.js`.");
+  lines.push("> Regenerate with `node ncube.js remove --write-docs`. Do not edit by hand.");
+  lines.push("");
+  lines.push(
+    "A template ships things your project will not need. **Dead code is worse than absent",
+  );
+  lines.push(
+    "code** — it gets read, maintained, copied into new modules, and it makes every search",
+  );
+  lines.push("noisier. Take out what you are not using, early, while it is still easy.");
+  lines.push("");
+  lines.push("```bash");
+  lines.push("node ncube.js remove --list          # what can go");
+  lines.push("node ncube.js remove <name> --dry-run  # what it would touch");
+  lines.push("node ncube.js remove <name>          # do it, then type-check");
+  lines.push("```");
+  lines.push("");
+  lines.push(
+    "The command verifies every edit still matches the template **before** changing",
+  );
+  lines.push(
+    "anything. If you have modified one of the files it needs to touch, it stops and tells",
+  );
+  lines.push("you to finish by hand rather than half-applying the removal.");
+  lines.push("");
+  lines.push("Afterwards it runs `tsc --noEmit` and reports honestly. To undo:");
+  lines.push("`git checkout -- . && git clean -fd`.");
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+
+  for (const [key, f] of Object.entries(REMOVABLE)) {
+    lines.push(`## \`${key}\` — ${f.label}`);
+    lines.push("");
+    lines.push(f.summary);
+    lines.push("");
+    lines.push(`**Remove when:** ${f.when}`);
+    lines.push("");
+    lines.push(`**What still works:** ${f.keeps}`);
+    lines.push("");
+    if (f.note) {
+      lines.push(`> ⚠️ ${f.note}`);
+      lines.push("");
+    }
+    const touched = [];
+    (f.files ?? []).forEach((x) => touched.push([`\`${x}\``, "deleted"]));
+    (f.docs ?? []).forEach((x) => touched.push([`\`${x}\``, "deleted (and its row in the rules index)"]));
+    [...new Set((f.edits ?? []).map((e) => e.file))].forEach((x) =>
+      touched.push([`\`${x}\``, "edited"]),
+    );
+    [...new Set((f.strip ?? []).map((e) => e.file))].forEach((x) =>
+      touched.push([`\`${x}\``, "lines stripped"]),
+    );
+    (f.deps ?? []).forEach((x) => touched.push([`\`${x}\``, "dependency dropped"]));
+    if (touched.length) {
+      lines.push("| What | Action |");
+      lines.push("|---|---|");
+      touched.forEach(([a, b]) => lines.push(`| ${a} | ${b} |`));
+      lines.push("");
+    }
+    lines.push("---");
+    lines.push("");
+  }
+
+  lines.push("## Adding a removable feature");
+  lines.push("");
+  lines.push(
+    "Add an entry to `REMOVABLE` in `ncube.js` and run `node ncube.js remove --write-docs`.",
+  );
+  lines.push("");
+  lines.push(
+    "Use **exact strings** in `edits`, never regex. A match that fails is a clean stop; a",
+  );
+  lines.push("regex that half-matches quietly mangles the file.");
+  lines.push("");
+
+  const out = path.join(process.cwd(), "docs/OPTIONAL_PARTS.md");
+  fs.writeFileSync(out, lines.join("\n"));
+  ok("docs/OPTIONAL_PARTS.md regenerated from the manifest.");
+}
+
 // ── Entry point ────────────────────────────────────────────────────────────────
 function main() {
   const [, , command, ...rest] = process.argv;
@@ -982,6 +1448,8 @@ ${c.bold}Commands:${c.reset}
   ${c.cyan}startdomain${c.reset} <DomainName>              Scaffold a new feature domain
   ${c.cyan}listdomains${c.reset}                           List existing domains
   ${c.cyan}setup${c.reset}                                 Install shadcn/ui components
+  ${c.cyan}remove${c.reset} <feature> [--dry-run]           Strip an optional subsystem cleanly
+  ${c.cyan}remove${c.reset} --list                          What can be removed, and when to
   ${c.cyan}create${c.reset} <name> [--variant base|rbac|full]  ${c.dim}(deprecated)${c.reset} Bootstrap locally
   ${c.cyan}bump${c.reset} <patch|minor|major>              Bump version + add changelog entry
 
@@ -990,6 +1458,8 @@ ${c.bold}Examples:${c.reset}
   node ncube.js startdomain Product
   node ncube.js listdomains
   node ncube.js setup
+  node ncube.js remove --list
+  node ncube.js remove permissions --dry-run
   node ncube.js bump minor
 `);
     return;
@@ -1008,6 +1478,11 @@ ${c.bold}Examples:${c.reset}
     case "setup":
       cmdSetup();
       break;
+    case "remove":
+      if (rest[0] === "--write-docs") cmdRemoveDocs();
+      else cmdRemove(rest[0], rest.slice(1));
+      break;
+
     case "bump":
       cmdBump(rest[0]);
       break;
