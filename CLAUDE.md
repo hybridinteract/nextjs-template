@@ -18,6 +18,8 @@ framer-motion · lucide-react · big.js. Path alias `@/*` → `src/*`.
 npm run type-check && npm run lint && npm test && npm run build
 ```
 
+And before opening a PR, the browser suite: `npm run test:e2e`.
+
 `npm run lint` **is** clean. Keep it that way — this template starts with zero problems, and
 a baseline of "known failures" is how a lint run stops being read. Run it especially when you
 touch dates or numbers: the `no-restricted-syntax` rules in `eslint.config.mjs` are
@@ -286,11 +288,23 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 
 → [`docs/rules/16-testing.md`](docs/rules/16-testing.md)
 
-- `npm test` runs Node's built-in runner with native TS stripping. No dependency, no config.
-- Cover the modules whose failure mode is **silent**: money, dates, dirty-checking, parsing.
-  Everything else fails loudly and is caught by `type-check` and `build`.
-- Test files sit beside the module, import with an explicit `.ts` extension, and each test
-  carries a comment naming the production consequence if it fails.
+Two layers. **If an assertion depends on a real layout, a real animation or a real
+navigation, jsdom cannot see it and it belongs in Playwright.**
+
+| Layer | Command | For |
+|---|---|---|
+| Vitest (jsdom) | `npm test` | Pure functions and component logic. ~1s. |
+| Playwright | `npm run test:e2e` | The shared systems, desktop **and** mobile. |
+
+- Vitest covers the modules whose failure mode is **silent**: money, dates, dirty-checking.
+  Everything else fails loudly and `type-check` + `build` catch it.
+- Test files sit beside the code; Playwright specs live in `e2e/`.
+- **Every test carries a comment naming what breaks in production if it fails.**
+- In Playwright, query only visible elements — `DataTable` renders both layouts and lets CSS
+  choose, so a bare `.first()` can resolve to a hidden node. Use `visibleText()` from
+  `e2e/fixtures/helpers.ts`.
+- The e2e suite runs with **no backend** (`e2e/fixtures/mock-api.mjs`). Keep it that way.
+- Don't add a third runner.
 
 ## 17. PWA & offline
 
@@ -346,6 +360,7 @@ Build `lib/<domain>/` in the order of the §1 table (`transformers.ts` carries i
 `<XDetailModal>` (shared `<Modal>`, `isDirty`) → the server `page.tsx` (metadata,
 `<PageLayout>`) + `loading.tsx` → gate create/edit/delete with `usePermission` → register the
 route in `config.ts` and the keys in `lib/permissions/` → tests for anything with a silent
-failure mode → `npm run type-check && npm run lint && npm test && npm run build` all clean.
+failure mode → `npm run type-check && npm run lint && npm test && npm run build` all clean,
+and `npm run test:e2e` before the PR.
 
 `node ncube.js startdomain <Name>` scaffolds the whole shape.

@@ -53,6 +53,8 @@ String-based money and quantity maths, and their formatters.
 
 **What still works:** Everything else. Dates are a separate module and stay.
 
+**Remove `e2e` first** — it depends on this one.
+
 > ⚠️ The Intl.NumberFormat lint rules stay. If you now format numbers by hand, delete the two NumberFormat selectors in eslint.config.mjs — and read docs/rules/12 first, because the browser-locale trap they prevent is real either way.
 
 | What | Action |
@@ -111,12 +113,34 @@ URL-synced search, filters, sort, pagination, row selection and bulk actions.
 
 **What still works:** <DataTable> stays — you would render it yourself and own the state.
 
+**Remove `e2e` first** — it depends on this one.
+
 > ⚠️ Removing this means hand-rolling page/search/filter state, which docs/rules/07 exists to talk you out of. Read it first.
 
 | What | Action |
 |---|---|
 | `src/components/data-view` | deleted |
 | `docs/rules/07-list-pages.md` | deleted (and its row in the rules index) |
+
+---
+
+## `e2e` — End-to-end tests (Playwright)
+
+The browser suite, its mock backend, and the fixture route the shared-system tests drive.
+
+**Remove when:** You are not going to run a browser suite. Deleting it also removes the fixture route from your app entirely.
+
+**What still works:** The Vitest layer stays — unit and component tests keep running with `npm test`.
+
+> ⚠️ docs/rules/16-testing.md still describes two layers. Trim its Playwright half so the doc matches what you have.
+
+| What | Action |
+|---|---|
+| `e2e` | deleted |
+| `playwright.config.ts` | deleted |
+| `src/app/(dashboard)/dashboard/e2e-fixtures` | deleted |
+| `package.json` | edited |
+| `@playwright/test` | dependency dropped |
 
 ---
 

@@ -1054,6 +1054,8 @@ const REMOVABLE = {
     when: "Your app shows no money, no decimals, and no quantities.",
     files: ["src/lib/numeric"],
     deps: ["big.js", "@types/big.js"],
+    // The e2e fixture page formats money and quantities, so it has to go first.
+    removeFirst: ["e2e"],
     docs: [],
     edits: [
       {
@@ -1142,9 +1144,33 @@ const REMOVABLE = {
     files: ["src/components/data-view"],
     deps: [],
     docs: ["docs/rules/07-list-pages.md"],
+    // The e2e fixture page is a DataView, so it has to go first.
+    removeFirst: ["e2e"],
     edits: [],
     note:
       "Removing this means hand-rolling page/search/filter state, which docs/rules/07 exists to talk you out of. Read it first.",
+  },
+
+  e2e: {
+    label: "End-to-end tests (Playwright)",
+    summary:
+      "The browser suite, its mock backend, and the fixture route the shared-system tests drive.",
+    keeps:
+      "The Vitest layer stays — unit and component tests keep running with `npm test`.",
+    when:
+      "You are not going to run a browser suite. Deleting it also removes the fixture route from your app entirely.",
+    files: ["e2e", "playwright.config.ts", "src/app/(dashboard)/dashboard/e2e-fixtures"],
+    deps: ["@playwright/test"],
+    docs: [],
+    edits: [
+      {
+        file: "package.json",
+        find: '    "test:e2e": "playwright test",\n    "test:e2e:ui": "playwright test --ui",\n',
+        replace: "",
+      },
+    ],
+    note:
+      "docs/rules/16-testing.md still describes two layers. Trim its Playwright half so the doc matches what you have.",
   },
 
   "dark-mode": {
@@ -1244,6 +1270,21 @@ function cmdRemove(name, flags) {
   console.log(`  ${c.dim}${feature.summary}${c.reset}`);
   console.log(`  ${c.dim}Keeps: ${feature.keeps}${c.reset}\n`);
 
+  // ── Ordering: some features are used by others, so they cannot go first. ──
+  for (const dep of feature.removeFirst ?? []) {
+    const stillHere = (REMOVABLE[dep]?.files ?? []).some((f) =>
+      fs.existsSync(path.join(process.cwd(), f)),
+    );
+    if (stillHere) {
+      err(`Remove \`${dep}\` first — it uses ${name}.`);
+      dim(`  node ncube.js remove ${dep}`);
+      dim(`  node ncube.js remove ${name}`);
+      console.log("");
+      warn("Nothing was changed.");
+      process.exit(1);
+    }
+  }
+
   // ── Verify every edit still matches before changing anything. ──────────────
   // Half-applied removals are the failure mode worth designing against: the
   // build breaks and it is not obvious which of ten edits landed.
@@ -1334,6 +1375,10 @@ function cmdRemove(name, flags) {
   console.log("");
   step("Checking the project still compiles…");
   try {
+    // Next's generated route types still name the pages just deleted, and
+    // tsconfig includes them. Stale entries would read as real errors.
+    fs.rmSync(path.join(process.cwd(), ".next/types"), { recursive: true, force: true });
+    fs.rmSync(path.join(process.cwd(), ".next/dev/types"), { recursive: true, force: true });
     execSync("npx tsc --noEmit", { stdio: "pipe", cwd: process.cwd() });
     ok("type-check passed.");
     console.log("");
@@ -1409,6 +1454,12 @@ function cmdRemoveDocs() {
     lines.push("");
     lines.push(`**What still works:** ${f.keeps}`);
     lines.push("");
+    if ((f.removeFirst ?? []).length) {
+      lines.push(
+        `**Remove \`${f.removeFirst.join("`, `")}\` first** — it depends on this one.`,
+      );
+      lines.push("");
+    }
     if (f.note) {
       lines.push(`> ⚠️ ${f.note}`);
       lines.push("");

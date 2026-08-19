@@ -37,7 +37,17 @@ what was deliberately left behind.
   silently missing button.
 - **Modals now unmount.** framer-motion's `onAnimationComplete` does not fire in this setup,
   so every panel slid out of view and then stayed in the DOM. Unmount runs off a timer that
-  shares one duration with the animation.
+  shares one duration with the animation, and an e2e test now guards it.
+- **Form labels are associated with their controls.** `<Field>` rendered a label with no
+  `htmlFor`, so clicking it did nothing and a screen reader announced "edit text" with no
+  name. It now wires `id`, `aria-invalid` and `aria-describedby`, honouring a control's own
+  id when it has one.
+- **`usePermission` takes `Permission`, not `string`.** The parameter type undid the strict
+  union: a mistyped key compiled and returned false for everyone, so the button simply went
+  missing.
+- **`useLogin` primes the `/me` cache instead of invalidating it.** Nothing observes that
+  query on the login page, so invalidation fetched nothing and the dashboard mounted with an
+  empty sidebar. `useLogout` is a blocking mutation now, so it cannot be double-clicked.
 - **`lint` runs clean.** `next lint` was removed in Next 16; the script is now `eslint .` on
   a flat config, and the 28 problems it surfaced are fixed rather than baselined.
 
@@ -64,10 +74,23 @@ what was deliberately left behind.
   permissions policy, COOP, and HSTS in production.
 - **ESLint rules** that block `toLocale*String()`, `toISOString().slice(0,10)` and raw
   `Intl.NumberFormat` at error level. Only ESLint catches these.
-- **A test layer** — `npm test`, on Node's built-in runner. No dependency, no build step.
-  Covers the modules whose failure mode is silent: money, dates, dirty-checking.
+- **Two test layers.** `npm test` is Vitest + Testing Library (jsdom) for pure modules and
+  component logic — 36 tests, about a second. `npm run test:e2e` is Playwright across desktop
+  and mobile viewports — 40 tests, covering what jsdom cannot see: that a modal actually
+  leaves the DOM after closing, that the table becomes cards on a phone, that an
+  authenticated request really reaches the backend. It starts its own mock API, so it runs
+  with no backend.
 - **`--success` / `--warning` / `--info` tokens** in both themes, plus `<StatusBadge>`,
   `<PageHeader>`, `<PageLayout>`, `<Field>` and `<DetailRow>`.
+- **`node ncube.js remove <feature>`** — strips an optional subsystem cleanly: files, barrel
+  exports, imports, dependencies and its rule doc, then type-checks and reports honestly.
+  Seven are removable: permissions, numeric, reference, blocking-loading, data-view,
+  dark-mode and the e2e layer. `docs/OPTIONAL_PARTS.md` is generated from the same manifest,
+  so the two cannot drift.
+- **Installable as a PWA** — manifest, icons (including a full-bleed maskable one),
+  theme-color and `viewport-fit: cover`. **No service worker**, deliberately:
+  `docs/rules/17-pwa-and-offline.md` explains why, and what to do when a project needs
+  offline.
 - **`CLAUDE.md`** and **`docs/rules/`** — the conventions as a guardrail, and one file per
   rule behind it.
 - Mobile card layout in `DataTable`, nav grouping in the sidebar, `useOlderPages`,

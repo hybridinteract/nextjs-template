@@ -1,22 +1,19 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import { signIn, goToList, visibleText } from "./fixtures/helpers";
 
 // Layout tests, so they only mean anything in a real browser. jsdom has no
 // layout engine: it would report every element as 0x0 and pass regardless.
 
-async function goToList(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("test@example.com");
-  await page.getByLabel("Password").fill("hunter2");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-  await page.goto("/dashboard/__fixtures__");
-  await expect(page.getByText("47 widgets")).toBeVisible();
+async function open(page: Parameters<typeof signIn>[0]) {
+  await signIn(page);
+  await goToList(page);
+  await expect(visibleText(page, "47 widgets")).toBeVisible();
 }
 
 test("the page never scrolls sideways", async ({ page }) => {
   // The reason DataTable has a card layout at all. A wide table on a 375px
   // screen used to push the whole document out and take the nav with it.
-  await goToList(page);
+  await open(page);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
@@ -24,20 +21,26 @@ test("the page never scrolls sideways", async ({ page }) => {
 });
 
 test("rows are a table on desktop and cards on mobile", async ({ page }, testInfo) => {
-  await goToList(page);
+  await open(page);
   const table = page.locator("table");
+
+  // Asserted structurally rather than by text: the card labels are uppercased in
+  // CSS, so the DOM still says "Status" and a getByText("STATUS") would never
+  // match however the layout renders.
+  const cardFields = page.locator("dl");
 
   if (testInfo.project.name === "mobile") {
     await expect(table).toBeHidden();
-    await expect(page.getByText("STATUS").first()).toBeVisible(); // a card field label
+    await expect(cardFields.first()).toBeVisible();
   } else {
     await expect(table).toBeVisible();
+    await expect(cardFields.first()).toBeHidden();
   }
 });
 
 test("the modal is a side panel on desktop and a bottom sheet on mobile", async ({ page }, testInfo) => {
-  await goToList(page);
-  await page.getByText("Widget 05", { exact: true }).first().click();
+  await open(page);
+  await visibleText(page, "Widget 05").first().click();
   const heading = page.getByRole("heading", { name: "Widget 05" });
   await expect(heading).toBeVisible();
 
