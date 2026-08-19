@@ -29,5 +29,12 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    // Run by Node's own test runner (`npm test`) with native type stripping,
+    // which resolves the explicit `.ts` import specifier that `tsc` refuses
+    // without `allowImportingTsExtensions`. Nothing in the Next build imports
+    // them, so excluding them here costs no coverage.
+    "**/*.test.ts"
+  ]
 }

@@ -11,6 +11,93 @@ Follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ---
 
+## [0.2.0] — 2026-08-19
+
+Rebuilt most of the shared infrastructure from a production app this template seeded,
+and fixed two things that had never worked. See
+[`docs/TEMPLATE_UPDATE_PLAN.md`](docs/TEMPLATE_UPDATE_PLAN.md) for the reasoning and for
+what was deliberately left behind.
+
+### Fixed
+
+- **Authenticated API calls now work.** They never did. `api-client` built browser URLs
+  against `NEXT_PUBLIC_API_URL`, so every call went cross-origin to the backend while the
+  httpOnly cookies sat on the Next origin — they never travelled. Meanwhile `proxy.ts`
+  answered `/api/v1/*` with `NextResponse.next()`, but the app has no such route, so it
+  returned a 404 HTML page and the backend was never contacted. Browser requests are now
+  same-origin, and the proxy rewrites to the backend after attaching the token.
+- **The proxy strips six spoofable hop headers** (`x-forwarded-for`, `x-real-ip` and
+  friends) before forwarding. A browser can set them, and a backend reads them for rate
+  limits and the audit trail.
+- **`src/components/ui/` is now committed.** It used to be fetched from the shadcn registry
+  by `ncube setup`, so a fresh clone failed `type-check` and `build` on ~25 missing modules
+  and CI was red. `ncube setup` still works as a refresh.
+- **`Permission` is a strict union again.** The `| string` in it collapsed the type to plain
+  `string`, so a mistyped key compiled and returned `false` for every non-superuser — a
+  silently missing button.
+- **Modals now unmount.** framer-motion's `onAnimationComplete` does not fire in this setup,
+  so every panel slid out of view and then stayed in the DOM. Unmount runs off a timer that
+  shares one duration with the animation.
+- **`lint` runs clean.** `next lint` was removed in Next 16; the script is now `eslint .` on
+  a flat config, and the 28 problems it surfaced are fixed rather than baselined.
+
+### Added
+
+- **DataView** (`@/components/data-view`) — the list system. URL-synced search, filters,
+  sort and paging; server-driven; bulk actions; sortable headers; row selection. Four
+  explicit display states, including an **error slot with retry** and a real **empty state**.
+- **`<Modal>`** (`@/components/ui/modal`) — side panel on desktop, bottom sheet on mobile,
+  with tabs, view↔edit mode, and an **unsaved-work guard**. Companions in `@/lib/forms`:
+  `isFormDirty` and `useResetOnOpen`.
+- **`@/lib/numeric`** — money and quantities as decimal strings on big.js, with one pinned
+  locale.
+- **`@/lib/date-utils` rewritten** plus **`@/lib/timezone`** — instants and business dates
+  are different things, and the output format is fixed so it cannot be misread as mm/dd/yyyy.
+- **`@/lib/reference` + `<ReferencePicker>`** — ungated dropdown feeds. Fixes the shape where
+  a picker fed by a gated module list leaves a required field silently empty for anyone who
+  may use the form but not browse the register.
+- **Four error boundaries** — `app/error.tsx`, `global-error.tsx`, `not-found.tsx`, and
+  `(dashboard)/dashboard/error.tsx`, which keeps the shell alive when one page crashes.
+- **A session-expiry dialog** instead of a hard redirect from the api-client, which used to
+  throw away anything half-typed.
+- **Security headers** in `next.config.ts` — CSP, nosniff, frame options, referrer and
+  permissions policy, COOP, and HSTS in production.
+- **ESLint rules** that block `toLocale*String()`, `toISOString().slice(0,10)` and raw
+  `Intl.NumberFormat` at error level. Only ESLint catches these.
+- **A test layer** — `npm test`, on Node's built-in runner. No dependency, no build step.
+  Covers the modules whose failure mode is silent: money, dates, dirty-checking.
+- **`--success` / `--warning` / `--info` tokens** in both themes, plus `<StatusBadge>`,
+  `<PageHeader>`, `<PageLayout>`, `<Field>` and `<DetailRow>`.
+- **`CLAUDE.md`** and **`docs/rules/`** — the conventions as a guardrail, and one file per
+  rule behind it.
+- Mobile card layout in `DataTable`, nav grouping in the sidebar, `useOlderPages`,
+  `usePrefersReducedMotion`, `withAuthRetry`, `downloadApiFile`, `logger`, `ifMatch`.
+
+### Changed
+
+- **Docs reorganised.** `FRONTEND_ARCHITECTURE_GUIDE_V2.md` → `docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`,
+  rewritten as a narrative that links to `docs/rules/` rather than restating every rule.
+- `useMediaQuery` uses `useSyncExternalStore`, so a desktop no longer flashes the mobile
+  layout on first paint.
+- `useTabState` reads `useSearchParams` and holds no local state — the URL is the only
+  source of truth.
+- `NavLinks` moved out of `DashboardShell`'s render; it was remounting the whole nav on
+  every render.
+- The `Toaster` is the theme-aware shadcn wrapper.
+- CI runs type-check, lint, test and build.
+- Node 22 in CI.
+
+### Removed
+
+- **`formatCurrency` and `formatNumber`** from `lib/utils.ts`. Both took a `locale` argument
+  and did float maths on money. Use `@/lib/numeric`.
+- **`store.ts` is no longer generated** per domain. List state lives in the URL; a store for
+  it is a second source of truth the URL immediately contradicts.
+- **`FRONTEND_LLM_PROMPT.md`.** It was a third copy of the same rules, kept in step by hand.
+  `CLAUDE.md` is what an AI assistant reads.
+
+---
+
 ## [0.1.0] — 2026-05-04
 
 ### 🎉 Initial Template Release

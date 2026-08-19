@@ -2,8 +2,13 @@
 
 A production-ready, opinionated Next.js frontend template by Hybrid Interactive. Mirrors the structure of the FastAPI template on the frontend.
 
-**Architecture reference:** [`FRONTEND_ARCHITECTURE_GUIDE_V2.md`](./FRONTEND_ARCHITECTURE_GUIDE_V2.md)  
-**LLM rules:** [`FRONTEND_LLM_PROMPT.md`](./FRONTEND_LLM_PROMPT.md)
+**Conventions (read first):** [`CLAUDE.md`](./CLAUDE.md) — the guardrail, plus the anti-patterns list  
+**The rules, one per file:** [`docs/rules/`](./docs/rules/README.md)  
+**How it fits together:** [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md)  
+**All documentation:** [`docs/README.md`](./docs/README.md)
+
+Working with an AI assistant? Point it at [`CLAUDE.md`](./CLAUDE.md) — Claude Code reads it
+automatically, and any other tool can be told to read it from the repo.
 
 ---
 
@@ -11,7 +16,7 @@ A production-ready, opinionated Next.js frontend template by Hybrid Interactive.
 
 | Concern | Library | Version |
 |---------|---------|---------|
-| Framework | Next.js (App Router) | 15.x |
+| Framework | Next.js (App Router) | 16.x |
 | UI Library | React | 19.x |
 | Component Primitives | **shadcn/ui** | latest |
 | Server State | TanStack Query | 5.x |
@@ -22,8 +27,10 @@ A production-ready, opinionated Next.js frontend template by Hybrid Interactive.
 | Toasts | Sonner | 2.x |
 | Dark Mode | next-themes | 0.4.x |
 | Animations | Framer Motion | 12.x |
+| Decimal math | big.js | 7.x |
 | Auth | BFF pattern (httpOnly cookies) | — |
 | RBAC | Built-in permissions system | — |
+| Tests | Node's built-in runner | — |
 
 ---
 
@@ -97,45 +104,65 @@ npm run dev
 ```
 src/
 ├── app/
-│   ├── (auth)/                    # Unauthenticated pages (login, register)
+│   ├── (auth)/                    # Unauthenticated pages
 │   │   └── login/page.tsx
 │   ├── (dashboard)/               # Authenticated pages — permission-gated
-│   │   ├── config.ts              # PermissionedNavItem[], ROUTES — NO JSX
-│   │   ├── layout.tsx             # Auth sync → Zustand, dashboard shell
-│   │   └── dashboard/             # All authenticated routes live under /dashboard
+│   │   ├── config.ts              # PermissionedNavItem[], ROUTES — pure data, no JSX
+│   │   ├── layout.tsx             # Seeds auth + role stores, renders the shell
+│   │   └── dashboard/
+│   │       ├── layout.tsx         # export const dynamic = "force-dynamic"
+│   │       ├── error.tsx          # A page can crash without taking the shell
 │   │       ├── loading.tsx        # Route skeleton
-│   │       ├── page.tsx           # Dashboard home → /dashboard
-│   │       └── <feature>/page.tsx # Feature pages → /dashboard/<feature>
-│   ├── api/
-│   │   └── auth/                  # BFF route handlers (manage httpOnly cookies)
-│   │       ├── login/route.ts
-│   │       ├── me/route.ts
-│   │       ├── refresh/route.ts
-│   │       └── logout/route.ts
-│   ├── globals.css                # Design tokens (single source of truth)
+│   │       └── <feature>/page.tsx # Server component
+│   ├── api/auth/                  # BFF route handlers — the only code holding cookies
+│   ├── error.tsx  global-error.tsx  not-found.tsx
+│   ├── globals.css                # Design tokens — the single source of truth
 │   └── layout.tsx                 # Root layout + provider stack
 │
 ├── components/
-│   ├── layout/                    # DashboardShell (sidebar + main)
-│   ├── loading/                   # GlobalLoadingOverlay, FullscreenLoader
-│   ├── providers/                 # QueryProvider, ThemeProvider wrappers
-│   ├── shared/                    # DataTable, StatsCard, lazy.tsx
-│   └── ui/                        # shadcn/ui components (added via CLI)
+│   ├── data-view/                 # The list system: toolbar, table, paging, bulk actions
+│   ├── ui/                        # shadcn primitives + Modal, StatusBadge, PageHeader
+│   ├── shared/                    # DataTable, ReferencePicker, Field/DetailRow, lazy
+│   ├── layout/                    # DashboardShell, PageLayout
+│   ├── loading/                   # Global blocking overlay
+│   ├── auth/                      # SessionExpiredDialog
+│   └── providers/                 # QueryProvider
 │
-├── hooks/                         # App-wide hooks (useMediaQuery, useDebounce)
+├── hooks/                         # useMediaQuery, useDebounce, useOlderPages
 │
 ├── lib/
-│   ├── api-client.ts              # Singleton HTTP client (stateless)
-│   ├── utils.ts                   # cn(), formatCurrency, formatDate
-│   ├── date-utils.ts              # Date helpers (no external deps)
-│   ├── auth/                      # Auth domain (types, api, hooks, store)
-│   ├── permissions/               # RBAC (roles, permission checks, hooks)
-│   ├── loading/                   # Blocking loading system (useBlockingMutation)
-│   └── hooks/                     # Shared hooks (useTabState, useZustandTabSync)
+│   ├── api-client.ts              # The one HTTP client — stateless, same-origin
+│   ├── auth/                      # BFF auth + session-expiry store
+│   ├── permissions/               # RBAC: strict Permission union, hooks, mapping
+│   ├── loading/                   # useBlockingMutation + the overlay store
+│   ├── numeric/                   # Money & quantities on big.js — decimal strings
+│   ├── date-utils.ts  timezone.ts # Instants vs business dates
+│   ├── forms/                     # isFormDirty, useResetOnOpen
+│   ├── reference/                 # Ungated dropdown feeds
+│   ├── utilities/                 # Downloads, logger
+│   ├── hooks/                     # useTabState, useZustandTabSync
+│   └── <domain>/                  # types → transformers → api → hooks → index
 │
-├── proxy.ts                  # Route protection + API proxy auth injection
-└── types/
-    └── index.ts                   # AppError, NavItem, global types
+├── proxy.ts                       # Route protection + the API rewrite to the backend
+└── types/index.ts                 # AppError, NavItem, shared shapes
+
+docs/
+├── README.md                      # Documentation index
+├── rules/                         # One rule per file — the detail behind CLAUDE.md
+└── FRONTEND_ARCHITECTURE_GUIDE_V3.md
+```
+
+---
+
+## Checks
+
+Four commands. All four must pass before a change is done — CI runs the same set.
+
+```bash
+npm run type-check   # tsc --noEmit
+npm run lint         # eslint . — currently clean; keep it that way
+npm test             # Node's built-in runner, no dependency
+npm run build        # catches what type-check alone cannot
 ```
 
 ---
@@ -212,11 +239,17 @@ After running, follow the printed checklist to:
 ```
 □ 1. node ncube.js startdomain <Name>
 □ 2. Add backend + frontend types to src/lib/<name>/types.ts
-□ 3. Complete transformers in src/lib/<name>/transformers.ts
-□ 4. Add form fields in src/components/<name>/<name>-form.tsx
-□ 5. Add PermissionedNavItem to src/app/(dashboard)/config.ts
-□ 6. Add permissions to src/lib/permissions/config.ts
+□ 3. Complete transformers in src/lib/<name>/transformers.ts  (asEnum on every enum)
+□ 4. Add form fields in src/components/<name>/<name>-form.tsx  (RHF + zod)
+□ 5. Pass isDirty on the detail modal, and clear it on open
+□ 6. Add PermissionedNavItem + ROUTES to src/app/(dashboard)/config.ts
+□ 7. Add permission keys to src/lib/permissions/types.ts and helpers.ts
+□ 8. If anything else picks this module by id, add it to REFERENCE_RESOURCES
+□ 9. npm run type-check && npm run lint && npm test && npm run build
 ```
+
+The full version, with the reasoning behind each step, is the **New-feature checklist** at
+the bottom of [`CLAUDE.md`](./CLAUDE.md).
 
 ---
 
@@ -323,14 +356,13 @@ Use [oklch.com](https://oklch.com) to find your brand colors in the oklch color 
 
 ## Engineering Conventions
 
-See [FRONTEND_ARCHITECTURE_GUIDE_V2.md](./FRONTEND_ARCHITECTURE_GUIDE_V2.md) for the full guide, including:
+Three documents, three jobs:
 
-- Domain colocation rules
-- Server state vs client state (the most common mistake)
-- API layer architecture
-- Component sizing limits
-- TypeScript conventions
-- Error handling patterns
-- Form handling
+| Document | What it is for |
+|---|---|
+| [`CLAUDE.md`](./CLAUDE.md) | **The guardrail.** Every convention in one page, plus a numbered anti-patterns list. Claude Code reads it automatically. |
+| [`docs/rules/`](./docs/rules/README.md) | **The rules, one per file.** What each rule is, how it works here, what was deliberately left undone, and the commands that prove the file still matches the code. |
+| [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md) | **The narrative.** How the pieces fit together, and the life of a request end to end. |
 
-For LLM-assisted development, feed [FRONTEND_LLM_PROMPT.md](./FRONTEND_LLM_PROMPT.md) as your system prompt.
+Each rule has exactly one home, in `docs/rules/`. Everything else states it briefly and links
+there — so when a rule changes there is one file to edit.

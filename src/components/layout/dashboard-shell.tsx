@@ -199,7 +199,7 @@ export function DashboardShell({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={() => logout()}
+                  onClick={() => logout(undefined)}
                 >
                   <LogOut className="size-4 mr-2" />
                   Sign out

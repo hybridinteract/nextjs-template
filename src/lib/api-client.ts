@@ -1,4 +1,5 @@
 import { AppError } from "@/types";
+import { useSessionStore } from "@/lib/auth/session-store";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RequestOptions {
@@ -154,13 +155,15 @@ class ApiClient {
   /**
    * What happens when the session is truly gone.
    *
-   * A hard redirect throws away anything half-typed. `?redirect=` at least brings
-   * the user back to the page they were on — proxy.ts already reads it.
+   * Raises a flag; it does not navigate. `<SessionExpiredDialog>` picks it up and
+   * asks the user before leaving the page, because a redirect from here silently
+   * throws away whatever they had half-typed. The path travels with it so the
+   * login page can send them back — `proxy.ts` already reads `?redirect=`.
    */
   private onSessionExpired(): void {
     if (typeof window === "undefined") return;
     const back = `${window.location.pathname}${window.location.search}`;
-    window.location.href = `/login?redirect=${encodeURIComponent(back)}`;
+    useSessionStore.getState().markExpired(back);
   }
 
   private async request<T>(

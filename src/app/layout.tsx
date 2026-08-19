@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { GlobalLoadingOverlay } from "@/components/loading/global-loading-overlay";
+import { SessionExpiredDialog } from "@/components/auth/session-expired-dialog";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -41,6 +42,7 @@ export default function RootLayout({
           >
             {children}
             <GlobalLoadingOverlay />
+            <SessionExpiredDialog />
             <Toaster richColors position="top-right" />
           </ThemeProvider>
         </QueryProvider>
