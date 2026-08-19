@@ -9,8 +9,11 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
-    "//test": "Node's built-in runner with native TS stripping — no dependency, no build step. Covers the pure modules whose failure mode is silent: money math, date formatting, and the form dirty-check. The disabled warning is MODULE_TYPELESS_PACKAGE_JSON: we cannot set type=module because ncube.js is CommonJS, and the warning says nothing actionable.",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-setup.mjs --test \"src/**/*.test.ts\"",
+    "//test": "Two layers. `test` is Vitest — pure modules and component logic, fast, jsdom. `test:e2e` is Playwright — the shared systems in a real browser, because animations, layout and timing are where this codebase's bugs actually live. See docs/rules/16-testing.md.",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "setup": "node ncube.js setup",
     "init": "node ncube.js init"
   },
@@ -38,13 +41,21 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.0.14",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.0.14",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.11"
   }
 }

@@ -149,8 +149,33 @@ src/
 docs/
 ├── README.md                      # Documentation index
 ├── rules/                         # One rule per file — the detail behind CLAUDE.md
+├── OPTIONAL_PARTS.md              # What you can delete, and how
 └── FRONTEND_ARCHITECTURE_GUIDE_V3.md
 ```
+
+---
+
+## Trim what you don't need
+
+The template ships more than most projects use. Dead code is worse than absent code —
+it gets read, maintained and copied into new modules. Take it out early, while it is easy.
+
+```bash
+node ncube.js remove --list
+```
+
+Six subsystems can go cleanly: permissions/RBAC, decimal money, reference pickers, the
+blocking overlay, DataView, and dark mode. The command deletes the files, strips the
+imports and barrel exports, drops the dependencies, removes the matching rule doc, and
+then runs `tsc --noEmit` and tells you honestly whether it worked.
+
+```bash
+node ncube.js remove permissions --dry-run   # see what it would touch
+node ncube.js remove permissions             # do it
+```
+
+Commit first — that is what makes it revertible. Details:
+[`docs/OPTIONAL_PARTS.md`](./docs/OPTIONAL_PARTS.md).
 
 ---
 

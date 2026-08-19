@@ -1375,12 +1375,27 @@ function cmdRemoveDocs() {
     "The command verifies every edit still matches the template **before** changing",
   );
   lines.push(
-    "anything. If you have modified one of the files it needs to touch, it stops and tells",
+    "anything. If you have modified one of the files it needs to touch, it stops and",
   );
-  lines.push("you to finish by hand rather than half-applying the removal.");
+  lines.push(
+    "changes nothing, telling you to finish by hand rather than half-applying the removal.",
+  );
   lines.push("");
-  lines.push("Afterwards it runs `tsc --noEmit` and reports honestly. To undo:");
-  lines.push("`git checkout -- . && git clean -fd`.");
+  lines.push(
+    "That check is a substring match, so it will not catch every possible edit — a comment",
+  );
+  lines.push(
+    "appended to the last matched line still matches. The real guarantee is the step after:",
+  );
+  lines.push(
+    "the command runs `tsc --noEmit` and prints the failures verbatim rather than claiming",
+  );
+  lines.push("success. To undo everything: `git checkout -- . && git clean -fd`.");
+  lines.push("");
+  lines.push(
+    "**Commit before removing.** The command is designed to be revertible, and that only",
+  );
+  lines.push("works if there is something to revert to.");
   lines.push("");
   lines.push("---");
   lines.push("");
