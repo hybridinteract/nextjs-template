@@ -1,18 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
+import { signIn, goToList, visibleText, portalCount } from "./fixtures/helpers";
 
 // The Modal is the app's primary editing surface, and the two things worth
 // testing about it are both invisible to jsdom: whether it actually leaves the
 // DOM after its exit animation, and whether it is a side panel or a bottom sheet.
 
 async function openDetail(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("test@example.com");
-  await page.getByLabel("Password").fill("hunter2");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-
-  await page.goto("/dashboard/__fixtures__");
-  await page.getByText("Widget 05", { exact: true }).first().click();
+  await signIn(page);
+  await goToList(page);
+  await visibleText(page, "Widget 05").first().click();
   await expect(page.getByRole("heading", { name: "Widget 05" })).toBeVisible();
 }
 
@@ -26,9 +22,7 @@ test("closing a modal removes it from the DOM, not just from view", async ({ pag
   await page.getByLabel("Close").click();
 
   await expect(page.getByRole("heading", { name: "Widget 05" })).toBeHidden();
-  await expect
-    .poll(() => page.locator("body > div.fixed.inset-0").count(), { timeout: 3000 })
-    .toBe(0);
+  await expect.poll(() => portalCount(page), { timeout: 3000 }).toBe(0);
 });
 
 test("a dirty modal will not be closed by a stray Escape", async ({ page }) => {
@@ -61,9 +55,7 @@ test("Discard closes the panel and unmounts it", async ({ page }) => {
   await page.getByRole("button", { name: "Discard" }).click();
 
   await expect(page.getByRole("heading", { name: "Widget 05" })).toBeHidden();
-  await expect
-    .poll(() => page.locator("body > div.fixed.inset-0").count(), { timeout: 3000 })
-    .toBe(0);
+  await expect.poll(() => portalCount(page), { timeout: 3000 }).toBe(0);
 });
 
 test("an untouched modal closes straight away", async ({ page }) => {

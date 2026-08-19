@@ -30,7 +30,8 @@ automatically, and any other tool can be told to read it from the repo.
 | Decimal math | big.js | 7.x |
 | Auth | BFF pattern (httpOnly cookies) | — |
 | RBAC | Built-in permissions system | — |
-| Tests | Node's built-in runner | — |
+| Unit tests | Vitest + Testing Library | 4.x |
+| Browser tests | Playwright | 1.x |
 
 ---
 
@@ -186,9 +187,19 @@ Four commands. All four must pass before a change is done — CI runs the same s
 ```bash
 npm run type-check   # tsc --noEmit
 npm run lint         # eslint . — currently clean; keep it that way
-npm test             # Node's built-in runner, no dependency
+npm test             # Vitest: pure modules + component logic, ~1s
 npm run build        # catches what type-check alone cannot
 ```
+
+And the browser suite, before a PR:
+
+```bash
+npm run test:e2e     # Playwright: the shared systems, desktop and mobile
+```
+
+Two layers on purpose. If an assertion depends on a real layout, a real animation or a
+real navigation, jsdom cannot see it — those live in `e2e/`. It starts its own mock
+backend, so it runs with nothing else running.
 
 ---
 

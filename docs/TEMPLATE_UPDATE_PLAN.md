@@ -174,7 +174,7 @@ Three things came out differently once the code was in front of me:
 
 ---
 
-## Phase 2 — Hardening the defaults
+## Phase 2 — Hardening the defaults  ✅ done 19 Aug 2026
 
 | Change | Files | Why |
 |---|---|---|
@@ -188,7 +188,7 @@ Three things came out differently once the code was in front of me:
 
 ---
 
-## Phase 3 — Docs and the generator
+## Phase 3 — Docs and the generator  ✅ done 19 Aug 2026
 
 ### 3.1 One convention doc
 
@@ -230,6 +230,23 @@ on 16.1.6.
 ### 3.4 Version bump
 
 `node ncube.js bump minor` + a RELEASE_NOTES.md entry.
+
+---
+
+## Phase 4 — Beyond the original plan  ✅ done 19 Aug 2026
+
+Three things added after the phases above, at Avinash's direction:
+
+- **`node ncube.js remove <feature>`** — the template ships more than most projects need, and
+  dead code is worse than absent code. Seven subsystems strip cleanly; `docs/OPTIONAL_PARTS.md`
+  is generated from the same manifest so the docs cannot drift from the command.
+- **Installable PWA, no service worker.** Manifest and icons are free and risk-free. A service
+  worker is a caching proxy in front of an auth-gated app — the wrong config writes
+  authenticated data to disk that survives logout. Documented as opt-in in
+  `docs/rules/17-pwa-and-offline.md`.
+- **Two test layers.** Vitest for pure modules and component logic, Playwright for the shared
+  systems in a real browser. The split is not preference: both real bugs found during this
+  work were animation- and layout-shaped, which jsdom cannot see.
 
 ---
 

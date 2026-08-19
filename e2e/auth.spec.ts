@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { signIn } from "./fixtures/helpers";
 
 // The auth chain is the one thing in this template that was broken for months
 // without anyone noticing, because it fails identically to "the backend is down".
@@ -16,23 +17,14 @@ test("the login form validates before it calls anything", async ({ page }) => {
 });
 
 test("signing in reaches the dashboard", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("test@example.com");
-  await page.getByLabel("Password").fill("hunter2");
-  await page.getByRole("button", { name: "Sign in" }).click();
-
-  await expect(page).toHaveURL(/\/dashboard/);
+  await signIn(page);
 });
 
-test("an authenticated API call reaches the backend through the proxy", async ({ page, request }) => {
+test("an authenticated API call reaches the backend through the proxy", async ({ page }) => {
   // The bug: the client called the backend origin directly, so the httpOnly
   // cookie never travelled and this 404'd or 401'd. Same-origin is the fix, and
   // this is what proves it.
-  await page.goto("/login");
-  await page.getByLabel("Email").fill("test@example.com");
-  await page.getByLabel("Password").fill("hunter2");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await signIn(page);
 
   const res = await page.request.get("/api/v1/auth/me");
   expect(res.status()).toBe(200);
