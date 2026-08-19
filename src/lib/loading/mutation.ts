@@ -22,7 +22,7 @@ export function useBlockingMutation<TData, TError, TVariables, TContext>(
   return useMutation({
     ...options,
 
-    onMutate: async (variables) => {
+    onMutate: async (variables, context) => {
       const id = `blocking-${++tokenCounter}`;
       tokenRef.current = id;
       add({
@@ -30,7 +30,7 @@ export function useBlockingMutation<TData, TError, TVariables, TContext>(
         source: blockingOptions.source ?? "mutation",
         label: blockingOptions.label,
       });
-      return options.onMutate?.(variables);
+      return (await options.onMutate?.(variables, context)) as TContext;
     },
 
     onSettled: (...args) => {

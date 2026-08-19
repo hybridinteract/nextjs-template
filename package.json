@@ -1,13 +1,19 @@
 {
   "name": "nextjs-template",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
+    "//test": "Two layers. `test` is Vitest — pure modules and component logic, fast, jsdom. `test:e2e` is Playwright — the shared systems in a real browser, because animations, layout and timing are where this codebase's bugs actually live. See docs/rules/16-testing.md.",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "setup": "node ncube.js setup",
     "init": "node ncube.js init"
   },
@@ -15,12 +21,16 @@
     "@hookform/resolvers": "^3.10.0",
     "@tanstack/react-query": "^5.67.0",
     "@tanstack/react-query-devtools": "^5.67.0",
+    "@types/big.js": "^7.0.0",
+    "big.js": "^7.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "framer-motion": "^12.6.3",
     "lucide-react": "^0.475.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
+    "radix-ui": "^1.6.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
@@ -31,13 +41,21 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.0.14",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^30.0.1",
     "tailwindcss": "^4.0.14",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.11"
   }
 }

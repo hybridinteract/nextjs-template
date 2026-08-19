@@ -20,6 +20,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -61,6 +64,12 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
+  /* Semantic status colours. These exist so nothing has to reach for
+     `text-green-600`, which is invisible in dark mode. Every status pill,
+     validation message and diff marker uses these, not the raw palette. */
+  --success: oklch(0.55 0.14 152);
+  --warning: oklch(0.62 0.15 70);
+  --info: oklch(0.55 0.18 255);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -98,6 +107,10 @@
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
+  /* Lifted, not inverted — the light values are too dark to read here. */
+  --success: oklch(0.72 0.16 152);
+  --warning: oklch(0.78 0.15 78);
+  --info: oklch(0.72 0.16 250);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
