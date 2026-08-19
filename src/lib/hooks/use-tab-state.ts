@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 interface Tab {
   key: string;
@@ -12,34 +13,37 @@ interface UseTabStateOptions {
   paramName?: string;
 }
 
+/**
+ * Tab selection, held in the URL rather than in component state.
+ *
+ * There is deliberately **no local state here**. The query string is the only
+ * source of truth, so back/forward work, a tab is shareable by link, and there is
+ * no second copy to fall out of step with the URL. Reading `useSearchParams`
+ * makes it reactive, so an external URL change (a browser Back, a link from a
+ * notification) just re-renders with the new tab.
+ *
+ * Needs dynamic rendering — `app/(dashboard)/dashboard/layout.tsx` already exports
+ * `dynamic = "force-dynamic"` for exactly this.
+ */
 export function useTabState({ tabs, defaultTab, paramName = "tab" }: UseTabStateOptions) {
-  const getInitialTab = () => {
-    if (typeof window === "undefined") return defaultTab ?? tabs[0]?.key ?? "";
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get(paramName);
-    if (fromUrl && tabs.some((t) => t.key === fromUrl)) return fromUrl;
-    return defaultTab ?? tabs[0]?.key ?? "";
-  };
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const [activeTab, setActiveTabState] = useState<string>(getInitialTab);
+  const fromUrl = searchParams?.get(paramName);
+  const activeTab =
+    fromUrl && tabs.some((t) => t.key === fromUrl)
+      ? fromUrl
+      : defaultTab ?? tabs[0]?.key ?? "";
 
   const setActiveTab = useCallback(
     (tab: string) => {
-      setActiveTabState(tab);
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        url.searchParams.set(paramName, tab);
-        window.history.replaceState({}, "", url.toString());
-      }
+      const next = new URLSearchParams(searchParams?.toString() ?? "");
+      next.set(paramName, tab);
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false });
     },
-    [paramName],
+    [paramName, searchParams, pathname, router],
   );
-
-  useEffect(() => {
-    const initial = getInitialTab();
-    setActiveTabState(initial);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return [activeTab, setActiveTab] as const;
 }
