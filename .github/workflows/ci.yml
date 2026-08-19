@@ -14,7 +14,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -25,3 +25,13 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Last, because it is the slowest and the three above catch most of what
+      # it would. It stays in the job because type-check alone does not prove the
+      # app builds — a bad "use client" boundary or a barrel imported from a
+      # server component only fails here.
+      - name: Build
+        run: npm run build

@@ -195,6 +195,10 @@ Three things came out differently once the code was in front of me:
 Delete `FRONTEND_ARCHITECTURE_GUIDE_V2.md` (77KB) and `FRONTEND_LLM_PROMPT.md` (19KB).
 Phoenix deleted both as "generic scaffolding templates for a codebase we don't have".
 
+*Outcome: the guide was rewritten as `docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md` (a narrative
+that links to `docs/rules/`), and the LLM prompt was deleted outright — `CLAUDE.md` is what
+an AI tool reads, and a second copy of the same rules only drifts.*
+
 Write `CLAUDE.md` in their place, modelled on Phoenix's: module anatomy, the wire-format
 boundary, the API layer, TanStack Query rules, toasts and errors, permissions, list pages,
 components and routing, forms, styling, TypeScript, dates and numbers — then the numbered
