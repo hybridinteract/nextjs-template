@@ -16,6 +16,7 @@ Everything written down about this template, and what each thing is for.
 | Document | What it is for |
 |---|---|
 | [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) | What changed in each version of the template. |
+| [`OPTIONAL_PARTS.md`](OPTIONAL_PARTS.md) | **What you can delete.** Every optional subsystem, what it costs to keep, and the one command that removes it cleanly. Generated from `ncube.js` — read this early, while removal is still easy. |
 | [`TEMPLATE_UPDATE_PLAN.md`](TEMPLATE_UPDATE_PLAN.md) | The plan behind the 0.2.0 rewrite — what was brought over from the production app it seeded, and what was deliberately left there. Historical once the phases are done. |
 
 ## Which one do I read?
@@ -23,6 +24,7 @@ Everything written down about this template, and what each thing is for.
 | I want to… | Read |
 |---|---|
 | get the app running | [`../README.md`](../README.md) |
+| strip out what my project won't use | [`OPTIONAL_PARTS.md`](OPTIONAL_PARTS.md) |
 | understand the shape of the codebase | the architecture guide |
 | know whether I am allowed to do X | the matching file in [`rules/`](rules/README.md) |
 | check myself before opening a PR | the anti-patterns list in [`../CLAUDE.md`](../CLAUDE.md) |

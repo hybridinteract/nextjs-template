@@ -42,6 +42,7 @@ same contract restated in four places becomes four contracts that disagree.
 | [`14-files-and-downloads.md`](14-files-and-downloads.md) | make the browser save something |
 | [`15-errors-and-boundaries.md`](15-errors-and-boundaries.md) | handle a failure |
 | [`16-testing.md`](16-testing.md) | add a test, or decide something does not need one |
+| [`17-pwa-and-offline.md`](17-pwa-and-offline.md) | add a service worker, or wonder why there isn't one |
 
 ## Adding a rule
 

@@ -23,6 +23,11 @@ a baseline of "known failures" is how a lint run stops being read. Run it especi
 touch dates or numbers: the `no-restricted-syntax` rules in `eslint.config.mjs` are
 error-level and **only ESLint catches them** (tsc will not).
 
+**Not every section below applies to every project.** Six subsystems are optional and may
+have been removed with `node ncube.js remove <feature>` — permissions, numeric, reference,
+blocking-loading, data-view, dark-mode. Check whether the folder exists before assuming a
+rule applies. See [`docs/OPTIONAL_PARTS.md`](docs/OPTIONAL_PARTS.md).
+
 Narrative overview: [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md).
 Doc index: [`docs/README.md`](docs/README.md).
 
@@ -287,6 +292,20 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 - Test files sit beside the module, import with an explicit `.ts` extension, and each test
   carries a comment naming the production consequence if it fails.
 
+## 17. PWA & offline
+
+→ [`docs/rules/17-pwa-and-offline.md`](docs/rules/17-pwa-and-offline.md)
+
+- The app is **installable, not offline**: a manifest and icons, and deliberately **no
+  service worker**.
+- If you add one: **never cache `/api/v1/*` or an authenticated page.** Cache Storage is
+  unencrypted, on disk, and survives logout — one `NetworkFirst` rule over the API leaks the
+  last user's records to the next person on that machine.
+- Cache the shell and static assets only, version the cache name, clear caches in
+  `useLogout`, and ship a kill switch.
+- Offline **writes** need a queue and conflict handling. That is an architecture, not a
+  plugin.
+
 ---
 
 ## Anti-patterns — do NOT do these
@@ -318,6 +337,7 @@ Each line is a violation of the section in brackets; go there for the fix.
 20. `window.location.href` to recover from a failed request. [§15]
 21. Adding a field to the reference-option shape. [§13]
 22. `any`, or a literal union widened with `| string`. [§11]
+23. A service worker that caches an authenticated response. [§17]
 
 ## New-feature checklist
 
