@@ -53,38 +53,67 @@ function NavLinks({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  return (
-    <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-      {navItems.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard" && pathname.startsWith(item.href));
-        const Icon = item.icon;
+  // Preserve declaration order, but pull each group's items together under one
+  // heading. Ungrouped items keep their place at the top.
+  const sections = navItems.reduce<{ group?: string; items: PermissionedNavItem[] }[]>(
+    (acc, item) => {
+      const existing = acc.find((s) => s.group === item.group);
+      if (existing) existing.items.push(item);
+      else acc.push({ group: item.group, items: [item] });
+      return acc;
+    },
+    [],
+  );
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              isActive
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground/70",
-              collapsed && "justify-center px-2",
-            )}
-          >
-            {Icon && <Icon className="size-4 shrink-0" />}
-            {!collapsed && <span>{item.name}</span>}
-            {!collapsed && item.badge !== undefined && (
-              <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                {item.badge}
-              </span>
-            )}
-          </Link>
-        );
-      })}
+  return (
+    <nav className="flex-1 overflow-y-auto px-2 py-2">
+      {sections.map((section, i) => (
+        <div key={section.group ?? `_ungrouped-${i}`} className={cn(i > 0 && "mt-4")}>
+          {section.group && !collapsed && (
+            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+              {section.group}
+            </p>
+          )}
+          {/* Collapsed rail has no room for headings — a rule keeps the grouping
+              legible without them. */}
+          {section.group && collapsed && i > 0 && (
+            <div className="mx-2 mb-2 h-px bg-sidebar-border" />
+          )}
+          <div className="space-y-0.5">
+            {section.items.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  title={collapsed ? item.name : undefined}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground/70",
+                    collapsed && "justify-center px-2",
+                  )}
+                >
+                  {Icon && <Icon className="size-4 shrink-0" />}
+                  {!collapsed && <span className="truncate">{item.name}</span>}
+                  {!collapsed && item.badge !== undefined && (
+                    <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }

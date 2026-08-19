@@ -78,11 +78,90 @@ async function parseError(response: Response): Promise<AppError> {
   return new AppError(message, response.status, body, body);
 }
 
+// ── Optimistic concurrency ─────────────────────────────────────────────────────
+
+/**
+ * Edit precondition for a single-record write.
+ *
+ * Where a backend enforces it, every update of a business record declares which
+ * version it was built from, or the write is rejected with 428. The version is
+ * the `updatedAt` the read returned — echo it back untouched; never synthesise
+ * one from `Date.now()` or a re-read, which defeats the check it exists to make.
+ *
+ * A 409 back means someone else saved first: tell the user, refetch, and let them
+ * redo their edit on top. See {@link isConflict}.
+ */
+export function ifMatch(version: string): { headers: Record<string, string> } {
+  return { headers: { "If-Match": `"${version}"` } };
+}
+
+/** Did this write lose a race with someone else's save? (409 from the precondition.) */
+export function isConflict(err: unknown): boolean {
+  return err instanceof AppError && err.statusCode === 409;
+}
+
 // ── Singleton API client ───────────────────────────────────────────────────────
 // This client is stateless — it never stores tokens. Auth is handled by the
-// Next.js middleware (proxy.ts) which injects Authorization headers from cookies.
+// Next.js middleware (proxy.ts), which injects the Authorization header from the
+// httpOnly cookie. Do not add a second http client (no axios) and do not add
+// tokens here.
 class ApiClient {
   private refreshPromise: Promise<void> | null = null;
+
+  /**
+   * The 401 → refresh → retry dance, in one place.
+   *
+   * Every verb goes through here, including the blob helpers. Writing it per
+   * method is how the three copies in the app it came from drifted apart.
+   *
+   * `doFetch` is a thunk rather than a Response because the retry has to build a
+   * fresh request — a Response cannot be replayed.
+   */
+  private async withAuthRetry(doFetch: () => Promise<Response>): Promise<Response> {
+    const response = await doFetch();
+    if (response.status !== 401) return response;
+
+    // Deduplicate concurrent refreshes: a screen firing six queries at once must
+    // not send six refresh requests and rotate the token six times.
+    if (!this.refreshPromise) {
+      this.refreshPromise = fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error("Refresh failed");
+        })
+        .finally(() => {
+          this.refreshPromise = null;
+        });
+    }
+
+    try {
+      await this.refreshPromise;
+    } catch {
+      this.onSessionExpired();
+      throw new AppError("Session expired", 401);
+    }
+
+    const retried = await doFetch();
+    if (retried.status === 401) {
+      this.onSessionExpired();
+      throw new AppError("Session expired", 401);
+    }
+    return retried;
+  }
+
+  /**
+   * What happens when the session is truly gone.
+   *
+   * A hard redirect throws away anything half-typed. `?redirect=` at least brings
+   * the user back to the page they were on — proxy.ts already reads it.
+   */
+  private onSessionExpired(): void {
+    if (typeof window === "undefined") return;
+    const back = `${window.location.pathname}${window.location.search}`;
+    window.location.href = `/login?redirect=${encodeURIComponent(back)}`;
+  }
 
   private async request<T>(
     method: string,
@@ -91,73 +170,29 @@ class ApiClient {
     options?: RequestOptions,
   ): Promise<T> {
     const url = buildUrl(path, options?.params);
-
     const headers: Record<string, string> = {
       ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...options?.headers,
     };
 
-    const response = await fetch(url, {
-      method,
-      credentials: "include",
-      headers,
-      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
-      ...options?.fetchOptions,
-    });
-
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return null as T;
-    }
-
-    if (response.status === 401) {
-      // Deduplicate concurrent refresh attempts
-      if (!this.refreshPromise) {
-        this.refreshPromise = fetch("/api/auth/refresh", {
-          method: "POST",
-          credentials: "include",
-        })
-          .then((r) => {
-            if (!r.ok) throw new Error("Refresh failed");
-          })
-          .finally(() => {
-            this.refreshPromise = null;
-          });
-      }
-
-      try {
-        await this.refreshPromise;
-      } catch {
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
-        throw new AppError("Session expired", 401);
-      }
-
-      // Retry once after refresh
-      const retried = await fetch(url, {
+    const response = await this.withAuthRetry(() =>
+      fetch(url, {
         method,
         credentials: "include",
         headers,
-        body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+        body:
+          body instanceof FormData
+            ? body
+            : body !== undefined
+              ? JSON.stringify(body)
+              : undefined,
         ...options?.fetchOptions,
-      });
+      }),
+    );
 
-      if (!retried.ok) {
-        if (retried.status === 401 && typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
-        throw await parseError(retried);
-      }
-
-      if (retried.status === 204) return null as T;
-      return retried.json() as Promise<T>;
-    }
-
-    if (!response.ok) {
-      throw await parseError(response);
-    }
-
+    if (!response.ok) throw await parseError(response);
+    // 204 No Content — and any other body-less success.
+    if (response.status === 204) return null as T;
     return response.json() as Promise<T>;
   }
 
@@ -183,6 +218,46 @@ class ApiClient {
 
   upload<T>(path: string, formData: FormData, options?: RequestOptions): Promise<T> {
     return this.request<T>("POST", path, formData, options);
+  }
+
+  /** GET a binary payload (a PDF or spreadsheet export). Same auth handling. */
+  async downloadBlob(path: string, options?: RequestOptions): Promise<Blob> {
+    const url = buildUrl(path, options?.params);
+    const response = await this.withAuthRetry(() =>
+      fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers: { ...options?.headers },
+        ...options?.fetchOptions,
+      }),
+    );
+    if (!response.ok) throw await parseError(response);
+    return response.blob();
+  }
+
+  /**
+   * POST a JSON body and get a binary payload back.
+   *
+   * The GET sibling cannot carry a body, and a live preview has to send a whole
+   * definition to be rendered without being saved. A raw `fetch` in a module's
+   * `api.ts` would skip the auth handling — use this instead.
+   *
+   * Pass `fetchOptions: { signal }` for anything fired on a debounce, so an
+   * abandoned preview is cancelled rather than resolving over a newer answer.
+   */
+  async postBlob(path: string, body: unknown, options?: RequestOptions): Promise<Blob> {
+    const url = buildUrl(path, options?.params);
+    const response = await this.withAuthRetry(() =>
+      fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...options?.headers },
+        body: JSON.stringify(body),
+        ...options?.fetchOptions,
+      }),
+    );
+    if (!response.ok) throw await parseError(response);
+    return response.blob();
   }
 }
 

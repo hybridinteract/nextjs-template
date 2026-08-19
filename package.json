@@ -16,6 +16,8 @@
     "@hookform/resolvers": "^3.10.0",
     "@tanstack/react-query": "^5.67.0",
     "@tanstack/react-query-devtools": "^5.67.0",
+    "@types/big.js": "^7.0.0",
+    "big.js": "^7.0.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

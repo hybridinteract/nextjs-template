@@ -9,6 +9,8 @@ export interface BackendUser {
   is_superuser: boolean;
   role: string;
   permissions: string[];
+  /** IANA zone, or "auto" for the viewer's device. Optional — see AuthUser. */
+  timezone_preference?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +24,12 @@ export interface AuthUser {
   isSuperuser: boolean;
   role: string;
   effectivePermissions: string[];
+  /**
+   * Which zone this user reads timestamps in — an IANA name, or "auto" for their
+   * device. Optional because a backend need not offer the setting; when it is
+   * absent `useDisplayTimeZone()` falls back to `DEFAULT_TIME_ZONE`.
+   */
+  timezonePreference?: string | null;
   createdAt: string;
   updatedAt: string;
 }

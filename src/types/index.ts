@@ -38,11 +38,19 @@ export interface NavItem {
   href: string;
   icon?: React.ComponentType<{ className?: string }>;
   badge?: string | number;
+  /**
+   * Section heading this item sits under in the sidebar. Items with no group are
+   * rendered first, ungrouped. Once an app passes about eight modules a flat list
+   * stops being scannable — this is what keeps it navigable.
+   */
+  group?: string;
+  subItems?: NavItem[];
 }
 
 export interface PermissionedNavItem extends NavItem {
   permission?: string;
   permissions?: string[];
+  subItems?: PermissionedNavItem[];
 }
 
 // ── Utility types ──────────────────────────────────────────────────────────────
