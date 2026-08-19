@@ -29,3 +29,14 @@ export function useIsMobile(): boolean {
 export function useIsTablet(): boolean {
   return useMediaQuery("(max-width: 1024px)");
 }
+
+/**
+ * Whether the viewer has asked their system to reduce motion.
+ *
+ * Gate anything that moves on its own — a slide-in, a looping pulse, an
+ * auto-advancing carousel. For people with vestibular disorders this is not a
+ * preference, it is an accessibility requirement.
+ */
+export function usePrefersReducedMotion(): boolean {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+}

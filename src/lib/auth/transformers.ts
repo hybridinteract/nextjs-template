@@ -9,6 +9,7 @@ export function transformUser(raw: BackendUser): AuthUser {
     isSuperuser: raw.is_superuser,
     role: raw.role,
     effectivePermissions: raw.permissions ?? [],
+    timezonePreference: raw.timezone_preference ?? null,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
