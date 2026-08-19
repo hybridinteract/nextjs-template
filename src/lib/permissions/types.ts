@@ -24,7 +24,13 @@ export const PERMISSIONS = [
   "content.delete",
 ] as const;
 
-export type Permission = (typeof PERMISSIONS)[number] | string;
+// NB: deliberately NOT `| string`. That union collapses this to plain `string`, which
+// silently disables every guarantee around it: `PERMISSION_MAPPING` (a
+// `Record<Permission, …>`) stops requiring an entry per permission, and
+// `usePermission("users.read")` — a typo for `users.view` — type-checks while returning
+// false for every non-superuser, hiding the affordance. Keep it strict so a mistyped or
+// unmapped key is a compile error, not a silently missing button.
+export type Permission = (typeof PERMISSIONS)[number];
 
 // Re-export for use in layout
 export type { PermissionedNavItem };
