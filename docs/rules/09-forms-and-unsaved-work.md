@@ -1,7 +1,7 @@
 # Forms & Unsaved Work
 
 > Read this before you add a form, or a modal that holds typed input.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §9.
 
@@ -28,6 +28,8 @@ form that is several minutes of typing, and the user has no idea it was avoidabl
 - **It must also clear that state**, via `useResetOnOpen(isOpen, reset)`, a seeding
   `openCreate()`, or `<Modal onDiscard>`. These panels stay mounted while closed, so
   otherwise "Discard" throws nothing away and the values are still there on the next open.
+- **A closing panel keeps showing its record.** A wrapper that reads the record before it
+  renders `<Modal>` holds it with `useLastOpenValue(record, isOpen)`.
 - Autosave only where the record already exists and the form is long enough to earn it.
 
 ## 3. How it works here
@@ -36,6 +38,7 @@ form that is several minutes of typing, and the user has no idea it was avoidabl
 |---|---|
 | `src/lib/forms/dirty.ts` | `isFormDirty(current, initial)`, `isEqual`, `anyFilled`. |
 | `src/lib/forms/reset-on-open.ts` | `useResetOnOpen` — clears a panel on the false→true transition. |
+| `src/lib/forms/last-open-value.ts` | `useLastOpenValue` — holds a record on the true→false transition, while the panel slides out. |
 | `src/components/ui/modal.tsx` | The `isDirty` guard, the discard prompt, the `beforeunload` warning. |
 | `src/components/shared/form-fields.tsx` | `<Field>` and `<DetailRow>`. |
 
@@ -69,6 +72,18 @@ stale values once before clearing them, and `react-hooks/set-state-in-effect` re
 Do **not** pass react-hook-form's `reset` to it — RHF forms already re-`reset` on open from
 their own effect; keep it there.
 
+**`useLastOpenValue` is the other half.** A parent closes a panel by clearing its record,
+so `isOpen` goes false and the record goes null in the same render. `<Modal>` holds its own
+props through the exit animation, so a component that always renders `<Modal>` is fine.
+A wrapper that reads the record first is not. `if (!user) return null` unmounts the panel
+mid-slide, and `user ? <EditModal/> : <CreateModal/>` swaps to a different, closed modal.
+Either way it vanishes instead of sliding out.
+
+```tsx
+const shown = useLastOpenValue(user, isOpen);
+if (!shown) return null;
+```
+
 ## 4. Deliberately not done
 
 | Not done | Why |
@@ -95,6 +110,7 @@ done
 ```
 
 ```bash
-# Dirty checks written against empty instead of the opened state.
-grep -rn "isFormDirty(.*empty" src/
+# Dirty checks written against empty instead of the opened state. Expect zero. The
+# example in src/lib/forms/dirty.ts is a create form, which opens empty, so it is skipped.
+grep -rn "isFormDirty(.*empty" src/ | grep -v "src/lib/forms/"
 ```

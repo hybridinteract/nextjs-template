@@ -21,7 +21,8 @@ page component that carries the directive drags its whole subtree in with it.
 - Add `"use client"` **only** where hooks or interactivity are needed.
 - `page.tsx`: `export const metadata`, `<PageLayout>`, mount `<XView />`. Nothing else.
 - Detail, create and edit use the shared `<Modal>` (`@/components/ui/modal`). Do not build
-  a bespoke dialog.
+  a bespoke dialog. `placement="center"` opens it in the middle of a laptop screen, for
+  starting something new. A phone always gets the bottom sheet.
 - Read-only rows use `<DetailRow>`; form fields use `<Field>` — both from
   `@/components/shared`.
 - Reach for the shared barrel before writing a new control.
@@ -57,6 +58,15 @@ used to be last, so a toast raised while a page mounted went nowhere. Influen fo
 its "you're signed out" notice on the login page never appeared. Toasts from a click or a
 mutation were never affected, which is why nobody noticed. It sets its own z-index, so its
 DOM position does not change what is on top.
+
+**The Modal is a dialog to a screen reader.** The panel has `role="dialog"` and is named by
+its title. It has no `aria-modal`: the Select lists and popovers inside it portal to
+`<body>`, outside the panel, and `aria-modal` says everything outside is out of reach.
+
+**Escape closes the top layer only.** A Radix layer inside the panel (a Select's list, a
+popover, an AlertDialog) closes itself on Escape and marks the key handled, and the Modal
+then ignores that key. Until 30 Sep 2026 the Modal closed as well, so backing out of a
+dropdown threw the whole panel away.
 
 Auth state is seeded in `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps
 unauthenticated pages from firing `/api/auth/me`.

@@ -54,3 +54,25 @@ export function formatMoney(
     maximumFractionDigits: decimalPlaces,
   }).format(num);
 }
+
+const LAKH = 100000;
+const CRORE = 10000000;
+
+/**
+ * Money in the short Indian form, for a tile or a count with no room:
+ * "₹8.21L", "₹1.25Cr". Under a lakh it is the whole rupee amount, "₹95,453".
+ * Never on a bill or a ledger, where every rupee has to show.
+ *
+ * Rupees only, on purpose. Lakh and crore mean nothing in another currency, so
+ * this does not follow DEFAULT_CURRENCY. A project outside India writes its own
+ * K and M version.
+ */
+export function formatMoneyShort(value: MoneyString | number | null | undefined): string {
+  const amount = toBig(value as string);
+  const size = amount.abs();
+  // The sign goes before the ₹, where formatMoney puts it: "-₹8.21L", not "₹-8.21L".
+  const sign = amount.lt(0) ? "-" : "";
+  if (size.gte(CRORE)) return `${sign}₹${size.div(CRORE).toFixed(2)}Cr`;
+  if (size.gte(LAKH)) return `${sign}₹${size.div(LAKH).toFixed(2)}L`;
+  return formatMoney(value, "INR", 0);
+}

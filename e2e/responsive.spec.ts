@@ -59,3 +59,27 @@ test("the modal is a side panel on desktop and a bottom sheet on mobile", async 
     expect(box!.x + box!.width).toBeGreaterThan(viewport.width * 0.5);
   }
 });
+
+test("a centred modal sits in the middle on desktop and is a bottom sheet on mobile", async ({ page }, testInfo) => {
+  // `placement="center"` is for starting something new. The layout switch is
+  // CSS and a media query, so only a real viewport shows which one you get.
+  await open(page);
+  await page.getByRole("button", { name: "Add widget" }).click();
+  const dialog = page.getByRole("dialog", { name: "New widget" });
+  await expect(dialog).toBeVisible();
+  // Wait for the entry animation, so the box is where it ends up.
+  await page.waitForTimeout(500);
+
+  const box = (await dialog.boundingBox())!;
+  const viewport = page.viewportSize()!;
+
+  if (testInfo.project.name === "mobile") {
+    expect(box.width).toBeGreaterThan(viewport.width * 0.9);
+    expect(box.y + box.height).toBeGreaterThan(viewport.height * 0.9);
+  } else {
+    const centreX = box.x + box.width / 2;
+    const centreY = box.y + box.height / 2;
+    expect(Math.abs(centreX - viewport.width / 2)).toBeLessThan(4);
+    expect(Math.abs(centreY - viewport.height / 2)).toBeLessThan(4);
+  }
+});

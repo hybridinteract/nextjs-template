@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckSquare, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
+import { notify } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -45,6 +45,22 @@ function summarize(outcome: BulkOutcome, entityName: string) {
     return `Updated ${outcome.updated} ${entityName}.`;
   }
   return `Updated ${outcome.updated} ${entityName}, ${outcome.failed.length} skipped.`;
+}
+
+/**
+ * The aggregated toast for one bulk action — the §5 exception, where one user
+ * action fans out to many writes and reports a single outcome.
+ *
+ * A partial run is a warning, not a success. "Deleted 12, 1 skipped" behind a
+ * green tick reads as "all done" at a glance, and the row that did not go
+ * through is the only part of that sentence worth noticing.
+ */
+function reportOutcome(outcome: BulkOutcome, message: string) {
+  if (outcome.failed.length > 0) {
+    notify.warning(message);
+    return;
+  }
+  notify.success(message);
 }
 
 /**
@@ -101,12 +117,12 @@ export function BulkActionBar({ bulk, selectedIds, entityName = "items", onDone 
     setBusy(true);
     try {
       const outcome = await pendingField.apply(pendingValue, selectedIds);
-      toast.success(summarize(outcome, entityName));
+      reportOutcome(outcome, summarize(outcome, entityName));
       onDone();
       setFieldKey(null);
       setValue(null);
     } catch {
-      // Errors already surfaced by the underlying mutation's handleError → toast.error.
+      // Errors are already on screen from the underlying mutation's notify.fromError.
     } finally {
       setBusy(false);
       setPendingField(null);
@@ -119,14 +135,15 @@ export function BulkActionBar({ bulk, selectedIds, entityName = "items", onDone 
     setBusy(true);
     try {
       const outcome = await bulk.onDelete(selectedIds);
-      toast.success(
+      reportOutcome(
+        outcome,
         outcome.failed.length === 0
           ? `Deleted ${outcome.updated} ${entityName}.`
           : `Deleted ${outcome.updated} ${entityName}, ${outcome.failed.length} skipped.`,
       );
       onDone();
     } catch {
-      // Errors already surfaced by the underlying mutation's handleError → toast.error.
+      // Errors are already on screen from the underlying mutation's notify.fromError.
     } finally {
       setBusy(false);
       setDeleteOpen(false);

@@ -1,10 +1,9 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { AppError } from "@/types";
 import { useBlockingMutation } from "@/lib/loading";
+import { notify } from "@/lib/toast";
 import { useSessionStore } from "./session-store";
 import * as authApi from "./api";
 import type { LoginFormValues } from "./types";
@@ -53,10 +52,7 @@ export function useLogin() {
       });
       router.push("/dashboard");
     },
-    onError: (err) => {
-      const message = err instanceof AppError ? err.message : err instanceof Error ? err.message : "Login failed";
-      toast.error(message);
-    },
+    onError: (err) => notify.fromError(err, "Login failed"),
   });
 }
 
@@ -78,13 +74,7 @@ export function useLogout() {
       onError: (err) => {
         // Still signed in, so a real expiry later must still raise the dialog.
         useSessionStore.getState().cancelSignOut();
-        const message =
-          err instanceof AppError
-            ? err.message
-            : err instanceof Error
-              ? err.message
-              : "Logout failed";
-        toast.error(message);
+        notify.fromError(err, "Logout failed");
       },
     },
     { source: "auth", label: "Signing out…" },

@@ -51,6 +51,27 @@ test("a select opened inside a modal is on top of it, not behind it", async ({ p
   await expect(page.getByRole("combobox", { name: "Status" })).toHaveText("Archived");
 });
 
+test("Escape closes a select's list inside a modal, and only the list", async ({ page }) => {
+  // Radix closes its own layer on Escape and marks the key handled. The Modal
+  // listened on the document too and closed as well, so the key you press to
+  // back out of a dropdown threw away the whole panel. The delete confirm and
+  // every popover inside a modal did the same.
+  await openDetail(page);
+
+  await page.getByRole("combobox", { name: "Status" }).click();
+  await expect(page.getByRole("option", { name: "Archived" })).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("option", { name: "Archived" })).toBeHidden();
+
+  // A closing panel is still visible while it slides out, so checking straight
+  // away would pass either way. Wait out the exit animation, then look.
+  await page.waitForTimeout(800);
+  expect(await portalCount(page)).toBe(1);
+  await expect(page.getByRole("heading", { name: "Widget 05" })).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toBeHidden();
+});
+
 test("a dirty modal will not be closed by a stray Escape", async ({ page }) => {
   await openDetail(page);
   await page.getByLabel("Name").fill("Widget 05 edited");

@@ -19,6 +19,11 @@ whose output you can keep.
 
 ### Fixed
 
+- **Escape on a dropdown inside a `<Modal>` no longer closes the whole panel.** Radix
+  closes its own layer on Escape and marks the key handled, and the Modal closed as well,
+  so backing out of a Select threw the panel away. The delete confirm and every popover
+  inside a modal did the same. A Playwright test failed on desktop and mobile before the
+  fix. Phoenix, Influen and Herbally IP have the same Modal code.
 - **A `<Select>`, dropdown, popover or tooltip opened inside a `<Modal>` now opens on top
   of it.** The modal sat at `z-[100]` and every popper at `z-50`, so the option list painted
   behind the panel and the control looked dead. Every portalled layer now takes its z-index
@@ -79,6 +84,14 @@ whose output you can keep.
 - The README is rewritten: one quick start, a table of what to change for a new project,
   and no legacy sections.
 
+- **Toasts go through `notify` (`@/lib/toast`).** ESLint blocks importing `toast` from
+  sonner. Errors stay 8 seconds and successes 4, and a retried write replaces its last
+  error instead of stacking three. The auth hooks, the bulk-action bar and `startdomain`'s
+  output use it. A bulk run that skipped rows is now a warning, not a green success.
+  Ported from Influen.
+- **The `<Modal>` panel is a dialog to a screen reader**, named by its title. Only the
+  discard prompt had a role before.
+
 ### Added
 
 - **`npm run dev:mock`** runs the app against a fake backend that accepts any login, so
@@ -89,6 +102,16 @@ whose output you can keep.
   stamp, and warns about stamps older than 30 days. Ported from Influen.
 - **A Claude Code hook** (`.claude/settings.json`, `scripts/claude-lint-hook.mjs`) lints
   every file Claude edits and hands the errors straight back. Ported from Herbally IP.
+- **`<Modal placement="center">`** opens in the middle of a laptop screen, for starting
+  something new. A phone still gets the bottom sheet. From Herbally IP, without its styling.
+- **`useLastOpenValue`** (`@/lib/forms`) keeps a closing panel showing its record while it
+  slides out, for a wrapper that reads the record before rendering `<Modal>`. From Influen.
+- **Date helpers.** `formatTimeLeft` ("3 days left"), `formatCountdown` ("15:00") and the
+  `datetime-local` pair `instantFromZonedInput` / `zonedInputValue` from Influen.
+  `formatBusinessDayMonth` ("25 Sep") and `formatBusinessDateLong` ("Thursday, 24
+  September") from Herbally IP.
+- **`formatMoneyShort`** (`@/lib/numeric`): ₹8.21L and ₹1.25Cr for a tile with no room.
+  From Herbally IP, with its minus sign moved before the ₹ above a lakh.
 
 ### Removed
 

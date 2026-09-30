@@ -6,6 +6,7 @@ import {
 	useCallback,
 	useSyncExternalStore,
 	useState,
+	useId,
 	createContext,
 	useContext,
 } from "react";
@@ -45,8 +46,26 @@ const PANEL_SIZE_CLASS: Record<Exclude<ModalSize, "full" | "content">, string> =
 	panel: "sm:max-w-[calc(100%-1rem)] sm:m-2",
 };
 
+// A centred dialog's widths. The full-width sizes make no sense in the middle of
+// the screen, so they are refused below.
+const CENTER_SIZE_CLASS: Record<"small" | "medium" | "large" | "xlarge", string> = {
+	small: "max-w-md",
+	medium: "max-w-2xl",
+	large: "max-w-4xl",
+	xlarge: "max-w-6xl",
+};
+
 /** How long the open/close slide takes. Drives both the animation and the unmount. */
 const TRANSITION_MS = 350;
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+// The centred dialog rises a little as it fades in, then leaves quicker than it
+// came. Its exit has to stay shorter than TRANSITION_MS, or the unmount timer
+// cuts it off mid-fade.
+const CENTER_HIDDEN = { opacity: 0, y: 14, scale: 0.98 };
+const CENTER_SHOWN = { opacity: 1, y: 0, scale: 1 };
+const CENTER_EXIT_S = 0.22;
 
 export interface ModalTab {
 	id: string;
@@ -85,6 +104,13 @@ interface ModalProps {
 	 */
 	slideFrom?: "bottom" | "right";
 	/**
+	 * Where it opens on a laptop. "side" (default) is a panel at the right, for
+	 * opening a record from a list to view or edit it. "center" is a dialog in the
+	 * middle of the screen, for starting something new. On a phone both are the
+	 * same bottom sheet. Only small, medium, large and xlarge can be centred.
+	 */
+	placement?: "side" | "center";
+	/**
 	 * True while the form inside holds work the user has not saved.
 	 *
 	 * The modal's **own** close affordances — Escape, a backdrop click and the header
@@ -121,9 +147,17 @@ function ModalPanel({
 	onTabChange,
 	bodyClassName,
 	slideFrom = "bottom",
+	placement = "side",
 	isDirty = false,
 	onDiscard,
 }: ModalProps) {
+	// Checked on every device, so a wrong size fails on the laptop it was built on,
+	// not first on a phone where both placements look the same.
+	if (placement === "center" && !(size in CENTER_SIZE_CLASS)) {
+		throw new Error(`Modal: size "${size}" cannot be centred. Use small, medium, large or xlarge.`);
+	}
+	const titleId = useId();
+
 	// Keep the portal in the DOM until the exit animation finishes. Raised during
 	// render rather than in an effect: an effect paints one empty frame first, so
 	// the panel visibly pops in instead of sliding.
@@ -173,6 +207,10 @@ function ModalPanel({
 	const handleKeyDown = useCallback(
 		(e: KeyboardEvent) => {
 			if (e.key !== "Escape" || !isOpen) return;
+			// A Radix layer inside the panel (a Select's list, a popover, the delete
+			// confirm) closes itself on Escape and marks the key handled. Closing the
+			// panel as well would throw it away for a key meant for the dropdown.
+			if (e.defaultPrevented) return;
 			// While the prompt is up, Escape means "no, keep editing" — the safe answer.
 			// Letting it fall through would make one key both raise the guard and defeat it.
 			if (confirmingDiscard) {
@@ -248,7 +286,7 @@ function ModalPanel({
 
 	const transition = {
 		type: "tween" as const,
-		ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+		ease: EASE,
 		duration: TRANSITION_MS / 1000,
 	};
 
@@ -259,6 +297,15 @@ function ModalPanel({
 	const panelAnimate = slidesFromRight
 		? { x: isOpen ? 0 : "100%" }
 		: { y: isOpen ? 0 : "100%" };
+
+	const centered = placement === "center" && isDesktop;
+	const centerTransition = isOpen ? transition : { ease: EASE, duration: CENTER_EXIT_S };
+	const panelClass = centered
+		? cn(
+				"pointer-events-auto relative flex max-h-full w-full flex-col rounded-3xl border border-border bg-card text-card-foreground shadow-2xl",
+				CENTER_SIZE_CLASS[size as keyof typeof CENTER_SIZE_CLASS],
+			)
+		: `pointer-events-auto absolute bottom-0 left-0 right-0 sm:relative sm:bottom-auto sm:left-auto sm:right-auto w-full sm:w-auto sm:flex-1 bg-card text-card-foreground border border-border shadow-2xl flex flex-col rounded-t-3xl sm:rounded-3xl max-h-[92dvh] sm:max-h-full ${panelSizeClass}`;
 
 	const modalContent = show ? (
 		// `--z-modal`, not a bare number. Every portalled popper sits above it on
@@ -276,15 +323,24 @@ function ModalPanel({
 
 			{/* Panel container */}
 			<div
-				className="pointer-events-none absolute inset-y-0 right-0 sm:flex sm:justify-end"
-				style={containerStyle}
+				className={
+					centered
+						? "pointer-events-none absolute inset-0 flex items-center justify-center p-6"
+						: "pointer-events-none absolute inset-y-0 right-0 sm:flex sm:justify-end"
+				}
+				style={centered ? undefined : containerStyle}
 			>
-				{/* Panel — bottom sheet on mobile, side panel on desktop */}
+				{/* Panel — bottom sheet on mobile, side panel or centred dialog on desktop.
+				    No aria-modal: the Select lists and popovers inside it portal to
+				    <body>, outside this element, and aria-modal tells a screen reader
+				    everything outside the dialog is out of reach. */}
 				<motion.div
-					initial={panelInitial}
-					animate={panelAnimate}
-					transition={transition}
-					className={`pointer-events-auto absolute bottom-0 left-0 right-0 sm:relative sm:bottom-auto sm:left-auto sm:right-auto w-full sm:w-auto sm:flex-1 bg-card text-card-foreground border border-border shadow-2xl flex flex-col rounded-t-3xl sm:rounded-3xl max-h-[92dvh] sm:max-h-full ${panelSizeClass}`}
+					role="dialog"
+					aria-labelledby={titleId}
+					initial={centered ? CENTER_HIDDEN : panelInitial}
+					animate={centered ? (isOpen ? CENTER_SHOWN : CENTER_HIDDEN) : panelAnimate}
+					transition={centered ? centerTransition : transition}
+					className={panelClass}
 					style={{ willChange: "transform" }}
 				>
 					{/* Drag handle — mobile only */}
@@ -294,7 +350,7 @@ function ModalPanel({
 
 					{/* Header */}
 					<div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3.5 sm:px-6 sm:py-4 bg-card rounded-t-3xl sm:rounded-t-3xl">
-						<h2 className="truncate text-base font-semibold sm:text-lg">
+						<h2 id={titleId} className="truncate text-base font-semibold sm:text-lg">
 							{title}
 						</h2>
 						<div className="flex shrink-0 items-center gap-1">
@@ -367,11 +423,11 @@ function ModalPanel({
 						<div
 							role="alertdialog"
 							aria-modal="true"
-							aria-labelledby="modal-discard-title"
+							aria-labelledby={`${titleId}-discard`}
 							className="absolute inset-0 z-20 flex items-center justify-center rounded-t-3xl bg-background/80 p-4 backdrop-blur-sm sm:rounded-3xl"
 						>
 							<div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl">
-								<h3 id="modal-discard-title" className="text-base font-semibold">
+								<h3 id={`${titleId}-discard`} className="text-base font-semibold">
 									Discard your changes?
 								</h3>
 								<p className="mt-1.5 text-sm text-muted-foreground">
@@ -422,11 +478,13 @@ type LatchedProps = Pick<
 	| "mode"
 	| "onModeChange"
 	| "size"
+	| "placement"
 	| "bodyClassName"
 >;
 
 /**
- * Side panel on desktop, bottom sheet on mobile.
+ * Side panel on desktop (or a centred dialog, with `placement="center"`), bottom
+ * sheet on mobile.
  *
  * This outer component does one thing: hold the last props the panel was open
  * with, so the exit animation still has something to render. Everything else
