@@ -50,15 +50,18 @@ component → lib/<domain>/hooks.ts → lib/<domain>/api.ts → apiClient
 **The BFF handlers follow the backend template's auth routes exactly**, and so does the mock
 in `scripts/mock-api.mjs`, which the browser tests and `dev:mock` use. Login is JSON
 `{ email, password }` to `/auth/password/login`. Logout sends `{ refresh_token }`, so the
-backend revokes the session. The mock refuses the wrong path or body the way FastAPI does. A
-mock that accepts anything hid a broken sign-in from 8 Jun to 30 Sep 2026: the backend moved
-login from an OAuth2 form at `/auth/login`, the template kept posting there, and every test
-passed. When the backend changes an auth route, change the handler and the mock together.
+backend revokes the session. Refresh retires the token it was sent and issues a new pair,
+so a refresh token works once. The mock refuses the wrong path or body the way FastAPI does,
+and retires a used refresh token too. A mock that accepts anything hid a broken sign-in from
+8 Jun to 30 Sep 2026: the backend moved login from an OAuth2 form at `/auth/login`, the
+template kept posting there, and every test passed. When the backend changes an auth route,
+change the handler and the mock together.
 
 **`withAuthRetry`** is the single 401 → refresh → retry path, shared by every verb including
 the blob helpers. Concurrent refreshes are deduplicated, so a screen firing six queries
-sends one refresh, not six. If the refresh itself fails, it raises the session-expiry flag
-rather than navigating — see [`15-errors-and-boundaries.md`](15-errors-and-boundaries.md).
+sends one refresh, not six. It has to: the second refresh would carry a token the first had
+already retired. If the refresh itself fails, it raises the session-expiry flag rather than
+navigating — see [`15-errors-and-boundaries.md`](15-errors-and-boundaries.md).
 
 **`ifMatch(version)` / `isConflict(err)`** support optimistic concurrency where the backend
 enforces it: echo back the `updatedAt` the read returned, and a 409 means someone else saved

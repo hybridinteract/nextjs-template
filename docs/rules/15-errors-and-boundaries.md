@@ -1,7 +1,7 @@
 # Errors, Boundaries & Session Expiry
 
 > Read this before you handle a failure, or wonder what a user sees when something breaks.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §15.
 
@@ -23,8 +23,8 @@ An app with no error boundary answers all three with a white screen.
 
 - Every list surfaces its query error through `<DataView error onRetry>`. See
   [`07-list-pages.md`](07-list-pages.md).
-- Mutation errors go through the module's `handleError` → `toast.error`. See
-  [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md).
+- Mutation errors go through `notify.fromError(err, "Could not …")` in the hook's
+  `onError`. See [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md).
 - Errors from the API are `AppError` with `.statusCode` and `.message`. Narrow with
   `err instanceof AppError`, never with a string match on the message.
 - Do not delete the four boundary files. Each covers a different blast radius.
@@ -97,7 +97,7 @@ login page can mount before the last 401s land. `session-store.test.ts` pins eac
 ## 5. New module checklist
 
 1. Thread `error` and `onRetry` from the list hook into `<DataView>`.
-2. One `handleError` per module; every mutation uses it.
+2. Every mutation's `onError` is `notify.fromError`. No per-module error helper.
 3. Narrow with `instanceof AppError`.
 4. `logger.error` for anything worth knowing about, never `console`.
 
@@ -117,12 +117,14 @@ grep -rn "console\.\(log\|error\|warn\)" src/ | grep -v "src/lib/utilities/logge
 # Navigation on failure. Expect zero — the session store handles it.
 # Assignment only, comments stripped: reading `location.href` to build a URL is
 # fine, and session-store.ts quotes the old bad line in its docstring.
-grep -rnE "location\.href\s*=" src/ | grep -vE ":\s*\*|//
+grep -rnE "location\.href\s*=" src/ | grep -vE ":\s*\*|//"
 ```
 
 ```bash
-# Routes missing a loading.tsx beside their page.tsx.
-for p in $(find "src/app/(dashboard)" -name page.tsx); do
+# Routes missing a loading.tsx beside their page.tsx. Expect zero. The design
+# page and the e2e fixture load no data, so the dashboard's own skeleton covers
+# them, and they are left out.
+for p in $(find "src/app/(dashboard)" -name page.tsx | grep -v "/design/\|/e2e-fixtures/"); do
   [ -f "$(dirname "$p")/loading.tsx" ] || echo "no loading.tsx: $p"
 done
 ```

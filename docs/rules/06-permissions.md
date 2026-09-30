@@ -1,7 +1,7 @@
 # Permissions
 
 > Read this before you add a button that not everyone should see.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §6.
 
@@ -39,7 +39,7 @@ devtools, and a permission check that runs in the browser is a suggestion.
 | `src/lib/permissions/check.ts` | `PERMISSION_MAPPING` — frontend key → the backend names that grant it. |
 | `src/lib/permissions/store.ts` | The role, superuser flag and effective permission set, seeded from `/me`. |
 | `src/lib/permissions/hooks.ts` | `usePermission`, `useAnyPermission`, `useAllPermissions`, `useFilteredNavItems`. |
-| `src/lib/permissions/config.ts` | Role labels and colours, using semantic tokens. |
+| `src/lib/permissions/config.ts` | Role labels and the post-login redirect. |
 
 ```tsx
 const canCreate = usePermission("orders.create");
@@ -81,7 +81,8 @@ grep -rn "role === \|role !== " src/ | grep -v "src/lib/permissions/"
 # where a NavItem's `permission?: string` is narrowed on the way in (nav config
 # is plain data and cannot import the union without a cycle). A cast anywhere
 # else — especially in hooks.ts — means a mistyped key compiles again.
-grep -rn "as Permission" src/
+# Comment lines are skipped: hooks.ts explains why it has no casts.
+grep -rn "as Permission" src/ | grep -vE ":[0-9]+:\s*//"
 ```
 
 ```bash

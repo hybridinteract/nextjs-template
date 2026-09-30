@@ -11,11 +11,15 @@ Follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ---
 
-## [Unreleased]
+## [0.3.0] — 2026-09-30
 
-Fixes that Influen and Herbally IP found after they were built from 0.2.0, defaults
-that match the projects this template is actually used for, and a module generator
-whose output you can keep.
+What Influen and Herbally IP learned after they were built from 0.2.0. Their bug fixes,
+defaults that match the projects this template is actually used for, a module generator
+whose output you can keep, a public site, DataView filters and a command palette. Sign-in
+works against the backend template again, and signing out now ends the session there too.
+
+**Breaking:** `/` is a public page, not a redirect, and a `daterange` filter needs
+`fromKey` and `toKey`. Both are under Changed.
 
 ### Fixed
 
@@ -24,7 +28,8 @@ whose output you can keep.
   `/api/v1/auth/password/login`, JSON `{ email, password }`, on 8 Jun 2026, so every
   project started since could not sign in until someone found this. Phoenix and Influen
   had each fixed it in their own copies. The mock still took the old form, so every test
-  passed. It now answers like the backend, and refuses the wrong path or body.
+  passed. It now answers like the backend, and refuses the wrong path or body. Like the
+  backend, it also retires a refresh token once it has been used.
 - **Signing out now revokes the session on the backend.** The logout route sent no body.
   The backend needs one, with the refresh token, so it refused, and a copied refresh token
   kept working for up to 7 days after sign-out. It now sends the token whenever there is
@@ -77,6 +82,12 @@ whose output you can keep.
 - **The README said a failed refresh redirects to `/login`.** It shows the session-expired
   dialog, and has since 0.2.0. The README also described the old generator's output and
   the removed `create` command.
+- **Rules 04, 11 and 15 still sent errors through `handleError` and `toast.error`.**
+  `notify.fromError` replaced both in this release, and ESLint blocks `toast`. Rule 06 still
+  listed the deleted role colours.
+- **Five re-check commands in the rule docs were wrong.** Rule 15's navigation check was
+  missing a quote, so it never ran. Rule 17's manifest check checked nothing. Rules 04, 06
+  and 15 each had one that flagged code that was fine.
 
 ### Changed
 
@@ -99,6 +110,9 @@ whose output you can keep.
 - **CI no longer runs the Playwright suite.** Run `npm run test:e2e` on your machine before
   a PR, as Influen and Herbally IP already do. CI now also runs `check:docs` and
   `test:generator`.
+- **`npm run type-check` covers the test files.** `tsconfig.json` left out `*.test.ts`, a
+  leftover from when Node's own runner ran them. Vitest does not check types, so nothing
+  did. All seven pass. A project that merges this may find type errors in its own tests.
 - `config.ts` lost its Settings, Users and Access Control sidebar items. Those pages do not
   exist, so the links went to a 404.
 - The README is rewritten: one quick start, a table of what to change for a new project,
