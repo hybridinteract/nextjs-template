@@ -103,6 +103,7 @@ export function FixtureView() {
   const [detail, setDetail] = useState<Widget | null>(null);
   const [name, setName] = useState("");
   const [status, setStatus] = useState<Widget["status"]>("active");
+  const [creating, setCreating] = useState(false);
 
   const columns: Column<Widget>[] = [
     { key: "name", header: "Name", sortable: true, mobilePrimary: true },
@@ -155,7 +156,7 @@ export function FixtureView() {
           </div>
         }
         actions={
-          <Button size="sm">
+          <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
             Add widget
           </Button>
@@ -211,6 +212,12 @@ export function FixtureView() {
             <DetailRow label="Notes" value={null} />
           </div>
         </div>
+      </Modal>
+
+      {/* Starting something new opens centred on a laptop. It saves nothing: it is
+          here so the suite can check where a centred modal lands. */}
+      <Modal isOpen={creating} onClose={() => setCreating(false)} title="New widget" placement="center">
+        <p className="text-sm text-muted-foreground">The fixture saves nothing.</p>
       </Modal>
     </>
   );

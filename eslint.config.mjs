@@ -27,6 +27,32 @@ const config = [
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   {
+    // Toasts go through `notify` (@/lib/toast). It sets the durations and makes a
+    // retried save replace its last error instead of stacking three. Only
+    // `toast` is blocked: importing `Toaster` from sonner is fine.
+    // See `docs/rules/05-mutations-and-toasts.md`.
+    //
+    // Same flat-config trap as the block below: a second `no-restricted-imports`
+    // block would replace this one. Add paths here instead.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/lib/toast.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "sonner",
+              importNames: ["toast"],
+              message:
+                "Use notify from @/lib/toast. It sets the durations and stops a retried save from stacking identical errors. Errors in a mutation's onError are notify.fromError(err, \"Could not …\").",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Dates and numbers must go through the centralized layers
     // (@/lib/date-utils, @/lib/numeric), never raw browser-locale formatting.
     // See `docs/rules/12-dates-and-numbers.md`.

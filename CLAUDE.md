@@ -106,8 +106,11 @@ folders stay flat, so URLs and permission strings do not change.
 - Writes wrap **`useBlockingMutation`** (`@/lib/loading`) with a `label`.
 - `invalidateQueries` goes **inside** the `mutationFn`, awaited before returning.
 - **Success toasts live in the hook's `onSuccess`.** Components `await mutateAsync()` then
-  close or reset — they do **not** toast success. Errors go through the module's
-  `handleError`.
+  close or reset — they do **not** toast success.
+- **Toast through `notify` (`@/lib/toast`), never `toast` from `sonner`.** ESLint blocks the
+  import. Errors are `notify.fromError(err, "Could not …")` in `onError`: it shows the
+  backend's message, and a retry replaces its last error instead of stacking. A partial
+  result is `notify.warning`.
 - **Exception — multi-step forms:** one user action firing several mutations emits **one
   aggregated** toast in the component, and those hooks stay silent on success.
 - `<Toaster>` is mounted once in `src/app/layout.tsx`; don't add another.
@@ -162,8 +165,9 @@ const { data, isLoading, isPending, error, refetch } = useOrders(dv.apiParams);
   where hooks or interactivity are needed.
 - Detail/create/edit use the shared **`<Modal>`** (`@/components/ui/modal`): side panel on
   desktop / bottom sheet on mobile, with `size`, `tabs`, `mode` (view↔edit pencil),
-  `headerActions`, sticky `footer`. Read-only rows use `<DetailRow>`; form fields use
-  `<Field>`. Don't build bespoke dialogs.
+  `headerActions`, sticky `footer`. `placement="center"` opens it in the middle of a laptop
+  screen instead, for starting something new. Read-only rows use `<DetailRow>`; form fields
+  use `<Field>`. Don't build bespoke dialogs.
 - Reach for `@/components/shared` before writing a new control. **That barrel cannot be
   imported from a Server Component** — `lazy.tsx` calls `dynamic(…, { ssr: false })`. From a
   `page.tsx`, import by the component's own path.
@@ -198,6 +202,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 - **It must also clear that state**, via `useResetOnOpen(isOpen, reset)` (`@/lib/forms`), a
   seeding `openCreate()`, or `<Modal onDiscard>`: these panels stay mounted while closed, so
   otherwise "Discard" throws nothing away and the values are still there on the next open.
+- A wrapper that reads its record **before** rendering `<Modal>` (`if (!user) return null`,
+  or picking between two modals) makes the panel vanish instead of sliding out. Hold the
+  record with `useLastOpenValue(record, isOpen)` (`@/lib/forms`).
 - Autosave only where the record already exists and the form is long enough to earn it.
 
 ## 10. Styling — semantic tokens only
@@ -237,18 +244,23 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 → [`docs/rules/12-dates-and-numbers.md`](docs/rules/12-dates-and-numbers.md)
 
 - **All date/time formatting goes through `@/lib/date-utils`** — `formatDate`,
-  `formatDateTime`, `formatTime`, `formatBusinessDate`, `todayString`, `toDateString`. Never
+  `formatDateTime`, `formatTime`, `formatBusinessDate` (and its short and long forms),
+  `formatTimeLeft`, `formatCountdown`, `todayString`, `toDateString`. Never
   `toLocaleDateString()/toLocaleString()/toLocaleTimeString()` (browser-locale **and**
   browser-timezone dependent) and never `new Date(ymd)` on a `YYYY-MM-DD` business date
   (parses as UTC midnight → off-by-one west of UTC). ESLint blocks both.
 - Pass an explicit zone: **`useDisplayTimeZone()`** for instants, **`useBusinessTimeZone()`**
   for business-date inputs.
+- A `<input type="datetime-local">` has no zone. Read it with
+  `instantFromZonedInput(value, timeZone)` and fill it with `zonedInputValue(instant,
+  timeZone)`, never `new Date(value)`, which reads it in the device's zone.
 - **The defaults are India**: `DEFAULT_TIME_ZONE = "Asia/Kolkata"`, a 12-hour clock,
   `NUMBER_LOCALE = "en-IN"` (₹12,75,000) and `DEFAULT_CURRENCY = "INR"`. Change them once, in
   `date-utils.ts` and `numeric/`, for a project outside India. Never per call site.
 - **All money and quantity formatting goes through `@/lib/numeric`.** Values are decimal
   **strings**; arithmetic uses `big.js` (`toBig`, `sumMoney`, `lineTotal`). Never
-  `Intl.NumberFormat` at a call site.
+  `Intl.NumberFormat` at a call site. `formatMoneyShort` gives ₹8.21L and ₹1.25Cr for a
+  tile with no room. Never on a bill.
 - Quantities are stored at 3 dp, so the padding is storage, not information — render a raw
   wire string and you get `1990.000`. Use `formatQuantity` for **display**, and
   `toBig(x).toString()` when seeding an editable `type="number"` input.

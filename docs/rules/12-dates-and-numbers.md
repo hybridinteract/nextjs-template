@@ -30,6 +30,8 @@ the wrong number.
 - Instants (`*_at`) take a `timeZone`, from `useDisplayTimeZone()`.
 - Business dates (`*_date`) take none — use `formatBusinessDate`.
 - Prefill a date input with `todayString(useBusinessTimeZone())`.
+- Never `new Date(value)` on a `datetime-local` input. Read it with
+  `instantFromZonedInput(value, timeZone)`, fill it with `zonedInputValue(instant, timeZone)`.
 
 ### Numbers
 
@@ -47,7 +49,7 @@ the wrong number.
 | What you have | Looks like | Use | Timezone |
 | --- | --- | --- | --- |
 | **Instant** (`*_at`) | `2026-07-14T21:00:00Z` | `formatDate` / `formatDateTime` / `formatTime` | Needs one |
-| **Business date** (`*_date`) | `2026-07-15` | `formatBusinessDate` | **None** |
+| **Business date** (`*_date`) | `2026-07-15` | `formatBusinessDate`, or `formatBusinessDayMonth` ("15 Jul") and `formatBusinessDateLong` ("Wednesday, 15 July") | **None** |
 
 An instant is a point on the world's timeline; which day it reads as depends on the zone. A
 business date is a square on a paper calendar — no time, no zone. Running it through a zone
@@ -80,6 +82,20 @@ project outside India, change it once in `src/lib/date-utils.ts`.
 Times are **12-hour by default** ("9:00 PM"). No call site passes `hour12`, so the default
 is what every screen shows. Pass `hour12: false` where a screen really wants "21:00".
 
+### Deadlines, countdowns and typed times
+
+| Function | Gives | For |
+|---|---|---|
+| `formatTimeLeft(deadline)` | `{ text: "3 days left", expired, hoursLeft }` | A deadline hours or days off. The screen decides what counts as urgent from `hoursLeft`. |
+| `formatCountdown(seconds)` | `"15:00"`, `"0:09"` | A timer someone watches tick, like a code's expiry. Never goes below `0:00`. |
+| `instantFromZonedInput(value, tz)` | `"2026-09-08T09:00:00.000Z"` | Reading a `datetime-local` input. |
+| `zonedInputValue(instant, tz)` | `"2026-09-08T14:30"` | Filling a `datetime-local` input. |
+
+A `datetime-local` input has no zone. It hands back "2026-09-08T14:30", and
+`new Date()` reads that in the device's zone. The pair above reads and writes it in the
+zone the screen renders in, so the time someone types is the time that gets stored. It
+takes two passes, so a daylight-saving change can't put it an hour out.
+
 The short month is always three letters. Newer ICU spells September "Sept" in `en-GB`, so
 `date-utils` cuts every month to three to keep the format fixed.
 
@@ -88,7 +104,7 @@ The short month is always three letters. Newer ICU spells September "Sept" in `e
 | File | Responsibility |
 |---|---|
 | `numeric/decimal.ts` | `toBig`, `NUMBER_LOCALE`, the `MoneyString` / `QuantityString` types. |
-| `numeric/money.ts` | 2 dp. `DEFAULT_CURRENCY`, `quantizeMoney`, `lineTotal`, `taxAmount`, `sumMoney`, `formatMoney`. |
+| `numeric/money.ts` | 2 dp. `DEFAULT_CURRENCY`, `quantizeMoney`, `lineTotal`, `taxAmount`, `sumMoney`, `formatMoney`, `formatMoneyShort`. |
 | `numeric/quantity.ts` | 3 dp. `quantizeQuantity`, `isPositiveQuantity`, `formatQuantity`. |
 
 `NUMBER_LOCALE` is pinned to `en-IN`, so amounts group in lakhs and crores: ₹12,75,000.00,
@@ -100,6 +116,11 @@ per-call-site locale argument — that is how the split comes back.
 of its own, so the code never spells "INR" in forty places. When the backend sends a
 currency with each row, pass that instead. Leaving the currency out gives a plain grouped
 number, on purpose.
+
+`formatMoneyShort` gives the short Indian form for a tile with no room: ₹8.21L, ₹1.25Cr,
+and every rupee under a lakh (₹95,453). It is rupees only, whatever `DEFAULT_CURRENCY`
+says, because lakh and crore mean nothing in another currency. Never use it on a bill or a
+ledger, where every rupee has to show.
 
 Rounding is **half up**, matching a typical backend `quantize_money`. Quantities are stored
 at 3 dp, so the padding is storage, not information.

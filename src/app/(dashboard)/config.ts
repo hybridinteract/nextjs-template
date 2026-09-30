@@ -4,7 +4,7 @@ import type { PermissionedNavItem } from "@/lib/permissions";
 // ── Navigation items ────────────────────────────────────────────────────────
 // Add permission/permissions to gate visibility by role.
 // Leave both undefined to show to all authenticated users.
-// `node ncube.js startdomain <Name>` adds its module here and to ROUTES.
+// `node ncube.js startdomain` adds each new module here and to ROUTES.
 export const dashboardNavItems: PermissionedNavItem[] = [
   {
     name: "Dashboard",

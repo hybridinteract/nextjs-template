@@ -308,8 +308,8 @@ function mutationHook(f, { name, input, body, success, failure, label }) {
       mutationFn: async (${input}) => {
 ${body}
       },
-      onSuccess: () => toast.success("${success}"),
-      onError: (err) => handleError(err, "${failure}"),
+      onSuccess: () => notify.success("${success}"),
+      onError: (err) => notify.fromError(err, "${failure}"),
     }`;
   const call = f.blocking
     ? `useBlockingMutation(\n    ${options},\n    { source: "mutation", label: "${label}" },\n  )`
@@ -363,8 +363,7 @@ function generateHooksFile(n, f) {
   return `"use client";
 
 import { ${reactQuery} } from "@tanstack/react-query";
-import { toast } from "sonner";
-${loadingImport}import { AppError } from "@/types";
+${loadingImport}import { notify } from "@/lib/toast";
 import * as ${n.singular}Api from "./api";
 import { formToPayload } from "./transformers";
 import type { ${n.Singular}FormValues, ${n.Singular}ListParams } from "./types";
@@ -376,12 +375,6 @@ export const ${n.singular}Keys = {
   list: (params: ${n.Singular}ListParams) => [...${n.singular}Keys.lists(), params] as const,
   detail: (id: string) => [...${n.singular}Keys.all, "detail", id] as const,
 };
-
-function handleError(err: unknown, fallback: string) {
-  const message =
-    err instanceof AppError ? err.message : err instanceof Error ? err.message : fallback;
-  toast.error(message);
-}
 
 // Both queries use the global 30s staleTime. Pick another tier from
 // docs/rules/04-data-fetching.md if this data changes faster or slower.
@@ -401,8 +394,9 @@ export function use${n.Singular}(id: string | null) {
   });
 }
 
-// Success toasts live here, not in the component. Invalidation goes inside the
-// mutationFn and is awaited, so the list is fresh before the panel closes.
+// Toasts live here, not in the component. A failed retry replaces its last
+// error instead of stacking. Invalidation goes inside the mutationFn and is
+// awaited, so the list is fresh before the panel closes.
 ${create}
 ${update}
 ${remove}`;

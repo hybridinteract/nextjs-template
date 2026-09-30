@@ -2,6 +2,7 @@ import { test, expect } from "vitest";
 import {
   DEFAULT_CURRENCY,
   formatMoney,
+  formatMoneyShort,
   quantizeMoney,
   sumMoney,
   lineTotal,
@@ -79,4 +80,21 @@ test("positive-quantity check works on the string form", () => {
   expect(isPositiveQuantity("0.001")).toBe(true);
   expect(isPositiveQuantity("0.000")).toBe(false);
   expect(isPositiveQuantity("-1")).toBe(false);
+});
+
+test("the short form reads in lakhs and crores, and every rupee under a lakh", () => {
+  // A tile that says ₹8.21L for ₹82.1 lakh is off by ten and still looks right.
+  expect(formatMoneyShort("820542.00")).toBe("₹8.21L");
+  expect(formatMoneyShort("12500000")).toBe("₹1.25Cr");
+  expect(formatMoneyShort("100000")).toBe("₹1.00L");
+  expect(formatMoneyShort("95453.00")).toBe("₹95,453");
+  expect(formatMoneyShort(null)).toBe("₹0");
+});
+
+test("a negative short amount puts the minus before the rupee sign", () => {
+  // Herbally IP's version printed "₹-8.21L" above a lakh but "-₹95,453" below it,
+  // so one refunds column had two shapes for a minus.
+  expect(formatMoneyShort("-820542")).toBe("-₹8.21L");
+  expect(formatMoneyShort("-12500000")).toBe("-₹1.25Cr");
+  expect(formatMoneyShort("-95453")).toBe("-₹95,453");
 });
