@@ -24,6 +24,9 @@ whose output you can keep.
   so backing out of a Select threw the panel away. The delete confirm and every popover
   inside a modal did the same. A Playwright test failed on desktop and mobile before the
   fix. Phoenix, Influen and Herbally IP have the same Modal code.
+- **An empty submodule entry, `.claude/worktrees/confident-chaum-ff140c`, is gone.** An agent
+  worktree was committed by accident on 5 May, so every project made from the template got
+  it. `.claude/worktrees/` and `.claude/settings.local.json` are now ignored.
 - **A `<Select>`, dropdown, popover or tooltip opened inside a `<Modal>` now opens on top
   of it.** The modal sat at `z-[100]` and every popper at `z-50`, so the option list painted
   behind the panel and the control looked dead. Every portalled layer now takes its z-index
@@ -91,6 +94,16 @@ whose output you can keep.
   Ported from Influen.
 - **The `<Modal>` panel is a dialog to a screen reader**, named by its title. Only the
   discard prompt had a role before.
+- **ESLint holds the design rules.** No raw Tailwind palette, hex or hand-picked colour in a
+  class name. No size in square brackets outside the folders that build parts. No raw
+  `<button>`, `<input>`, `<select>`, `<textarea>`, `<dialog>` or `<table>` in feature code.
+  No other icon set or UI kit, Radix only through `components/ui`, fonts only in the root
+  layout. "Zero raw palette" used to be only written down. Ported from Herbally IP, with its
+  own type scale left out.
+- **`ROLE_COLORS` is deleted.** It held four raw-palette strings and nothing used it, in the
+  template or in any project built from it.
+- **CLAUDE.md's 23-item anti-patterns list is now a short index.** Each item repeated a rule
+  in its own section. Influen made the same cut.
 
 ### Added
 
@@ -112,6 +125,12 @@ whose output you can keep.
   September") from Herbally IP.
 - **`formatMoneyShort`** (`@/lib/numeric`): ₹8.21L and ₹1.25Cr for a tile with no room.
   From Herbally IP, with its minus sign moved before the ₹ above a lakh.
+- **A design page at `/dashboard/design`** shows every shared part in its common states:
+  colours, type, buttons, fields, status tones, data, toasts and dialogs. It uses only
+  parts `ncube remove` cannot take out. Not in the sidebar. The idea is Herbally IP's, the
+  page is new.
+- **A `build-ui` skill for Claude Code** (`.claude/skills/build-ui/`) sends Claude to the
+  design page and the parts before it builds a screen. Rewritten from Herbally IP's.
 
 ### Removed
 

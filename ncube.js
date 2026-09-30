@@ -1395,8 +1395,8 @@ const REMOVABLE = {
     edits: [
       {
         file: "eslint.config.mjs",
-        find: '    ignores: ["src/lib/date-utils.ts", "src/lib/numeric/**"],',
-        replace: '    ignores: ["src/lib/date-utils.ts"],',
+        find: '      "src/lib/date-utils.ts",\n      "src/lib/numeric/**",\n',
+        replace: '      "src/lib/date-utils.ts",\n',
       },
       {
         file: "src/lib/utils.ts",
@@ -1481,7 +1481,13 @@ const REMOVABLE = {
     docs: ["docs/rules/07-list-pages.md"],
     // The e2e fixture page is a DataView, so it has to go first.
     removeFirst: ["e2e"],
-    edits: [],
+    edits: [
+      {
+        file: "eslint.config.mjs",
+        find: '  "src/components/data-view/**",\n',
+        replace: "",
+      },
+    ],
     note:
       "Removing this means hand-rolling page/search/filter state, which docs/rules/07 exists to talk you out of. Read it first.",
   },

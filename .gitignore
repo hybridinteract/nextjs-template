@@ -42,3 +42,10 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# claude code
+# Agent worktrees are whole copies of the repo. One was committed by accident as
+# an empty submodule entry, and every project made from the template got it.
+/.claude/worktrees/
+# Per-person Claude Code settings. The shared ones are .claude/settings.json.
+/.claude/settings.local.json
