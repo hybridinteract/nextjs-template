@@ -1,7 +1,7 @@
 # Components & Routing
 
 > Read this before you add a page, a route, or a dialog.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §8.
 
@@ -47,9 +47,16 @@ src/app/
 ```
 
 **Provider stack** (`app/layout.tsx`, outermost → innermost): `QueryProvider` →
-`ThemeProvider` → `{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog` →
-`<Toaster>`. Only add a provider here if it is **truly global**; a feature-scoped provider
-belongs in that feature's `layout.tsx`.
+`ThemeProvider` → `<Toaster>` → `{children}` → `GlobalLoadingOverlay` →
+`SessionExpiredDialog`. Only add a provider here if it is **truly global**; a feature-scoped
+provider belongs in that feature's `layout.tsx`.
+
+**`<Toaster>` is first on purpose.** React runs an earlier sibling's effects before a later
+one's, and sonner's Toaster only shows toasts raised after its own effect subscribes. It
+used to be last, so a toast raised while a page mounted went nowhere. Influen found it when
+its "you're signed out" notice on the login page never appeared. Toasts from a click or a
+mutation were never affected, which is why nobody noticed. It sets its own z-index, so its
+DOM position does not change what is on top.
 
 Auth state is seeded in `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps
 unauthenticated pages from firing `/api/auth/me`.

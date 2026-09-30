@@ -261,7 +261,9 @@ function ModalPanel({
 		: { y: isOpen ? 0 : "100%" };
 
 	const modalContent = show ? (
-		<div className="fixed inset-0 z-[100]">
+		// `--z-modal`, not a bare number. Every portalled popper sits above it on
+		// the ladder in globals.css, which is what keeps a <Select> in here usable.
+		<div className="fixed inset-0 z-(--z-modal)">
 			{/* Backdrop */}
 			<motion.div
 				className="absolute inset-0 bg-black/40"

@@ -149,7 +149,7 @@ export function BulkActionBar({ bulk, selectedIds, entityName = "items", onDone 
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 24, scale: 0.95 }}
           transition={{ type: "spring", stiffness: 420, damping: 26 }}
-          className="fixed bottom-6 left-1/2 z-[100] flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-nowrap items-center gap-2.5 overflow-x-auto overflow-y-hidden rounded-2xl border border-border bg-popover px-4 py-2.5 text-popover-foreground shadow-2xl"
+          className="fixed bottom-6 left-1/2 z-(--z-modal) flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 flex-nowrap items-center gap-2.5 overflow-x-auto overflow-y-hidden rounded-2xl border border-border bg-popover px-4 py-2.5 text-popover-foreground shadow-2xl"
         >
           {/* Ambient top light beam highlight */}
           <div className="absolute inset-x-6 -top-px h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent pointer-events-none" />

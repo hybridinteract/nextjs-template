@@ -67,6 +67,24 @@ offering to stay would be a lie; what it buys is a beat to copy what is on scree
 Repeat notifications are ignored — six queries in flight report the same dead session six
 times, and the first one already told the truth.
 
+**A deliberate sign-out is not an expired session.** `useLogout` drops the cookies and clears
+the query cache while the dashboard is still mounted, so any query that refetches in that gap
+gets a 401. Influen shipped the result: its logout also cleared a saved store, that
+re-rendered the shell, and "Your session has ended" appeared on the login page at someone
+who had just clicked Sign out. The plain template does not re-render there, so it never
+showed here, but the first project that clears anything on logout would hit it.
+
+```
+useLogout onMutate → beginSignOut()      markExpired is ignored from here on
+<LoginForm> mounts → clearExpired()      closes any dialog, keeps the sign-out flag
+useLogin onSuccess → reset()             a new session; real expiries count again
+useLogout onError  → cancelSignOut()     still signed in; real expiries count again
+```
+
+The flag is raised before the request, not in `onSuccess`: the 401s arrive a beat later, so
+a flag set on success is already too late. `<LoginForm>` must not call `reset()`, because the
+login page can mount before the last 401s land. `session-store.test.ts` pins each of these.
+
 ## 4. Deliberately not done
 
 | Not done | Why |

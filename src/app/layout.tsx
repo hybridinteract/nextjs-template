@@ -64,10 +64,16 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            {/* The Toaster goes FIRST. React runs an earlier sibling's effects
+                before a later one's, and sonner's Toaster only shows toasts
+                raised after its own effect subscribes. Mounted last, it missed
+                every toast a page raised while mounting. Influen found it with
+                a "you're signed out" notice that never appeared. It sets its
+                own z-index, so being first in the DOM does not put it behind. */}
+            <Toaster richColors position="top-right" />
             {children}
             <GlobalLoadingOverlay />
             <SessionExpiredDialog />
-            <Toaster richColors position="top-right" />
           </ThemeProvider>
         </QueryProvider>
       </body>

@@ -25,6 +25,32 @@ test("closing a modal removes it from the DOM, not just from view", async ({ pag
   await expect.poll(() => portalCount(page), { timeout: 3000 }).toBe(0);
 });
 
+test("a select opened inside a modal is on top of it, not behind it", async ({ page }) => {
+  // Regression test for a bug Influen shipped from this template. The Modal
+  // and every Radix popper portal to document.body, so their z-indexes compete
+  // directly. The Modal sat at 100 and the poppers at 50, so a Select inside a
+  // panel opened behind it and the panel swallowed the click. The control looked
+  // dead. jsdom has no stacking or hit testing, so only a real browser sees it.
+  // `option.click()` alone would pass even when the option is buried, because
+  // Playwright clicks the element it located. `elementFromPoint` is the check.
+  await openDetail(page);
+
+  await page.getByRole("combobox", { name: "Status" }).click();
+  const option = page.getByRole("option", { name: "Archived" });
+  await expect(option).toBeVisible();
+
+  const box = (await option.boundingBox())!;
+  const topmostIsTheOption = await page.evaluate(
+    ([x, y]: number[]) =>
+      Boolean(document.elementFromPoint(x, y)?.closest("[data-slot='select-item']")),
+    [box.x + box.width / 2, box.y + box.height / 2],
+  );
+  expect(topmostIsTheOption).toBe(true);
+
+  await option.click();
+  await expect(page.getByRole("combobox", { name: "Status" })).toHaveText("Archived");
+});
+
 test("a dirty modal will not be closed by a stray Escape", async ({ page }) => {
   await openDetail(page);
   await page.getByLabel("Name").fill("Widget 05 edited");

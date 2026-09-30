@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { signIn } from "./fixtures/helpers";
+import { goToList, signIn } from "./fixtures/helpers";
 
 // The auth chain is the one thing in this template that was broken for months
 // without anyone noticing, because it fails identically to "the backend is down".
@@ -18,6 +18,26 @@ test("the login form validates before it calls anything", async ({ page }) => {
 
 test("signing in reaches the dashboard", async ({ page }) => {
   await signIn(page);
+});
+
+test("signing out does not tell you your session ended", async ({ page, isMobile }) => {
+  // Regression test for a bug Influen shipped from this template. Logout drops
+  // the cookies and clears the query cache while the dashboard is still mounted.
+  // Live queries refetch, get 401s, and each one raised "Your session has ended"
+  // on the login page, at someone who had just chosen to leave.
+  test.skip(isMobile, "The user menu is inside the nav sheet on a phone. The flag logic is the same.");
+  await signIn(page);
+  await goToList(page);
+
+  await page.getByRole("button", { name: /test@example\.com/ }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
+
+  // The 401s land a beat after the navigation, so give them time to arrive.
+  // Nothing to wait *for* here: the test is that nothing shows up.
+  await page.waitForTimeout(1500);
+  await expect(page.getByText("Your session has ended")).toHaveCount(0);
 });
 
 test("an authenticated API call reaches the backend through the proxy", async ({ page }) => {

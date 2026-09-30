@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { detailToMessage } from "@/lib/backend-error";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -19,8 +20,11 @@ export async function POST(request: Request) {
 
   if (!backendRes.ok) {
     const error = await backendRes.json().catch(() => ({}));
+    // `detail` is an array on a 422, not a sentence. Passed straight through,
+    // the login form got a list where it expected words.
+    const message = detailToMessage((error as { detail?: unknown }).detail);
     return NextResponse.json(
-      { message: (error as { detail?: string }).detail ?? "Login failed" },
+      { message: message ?? "Login failed" },
       { status: backendRes.status },
     );
   }

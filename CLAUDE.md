@@ -174,8 +174,9 @@ the sidebar section) and the `ROUTES` constants. Import route strings from `ROUT
 inline `/dashboard/orders`.
 
 **Provider stack** (`app/layout.tsx`, outermost → innermost): `QueryProvider` →
-`ThemeProvider` → `{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog` →
-`<Toaster>`. Only add a provider here if it is **truly global**. Auth state syncs in
+`ThemeProvider` → `<Toaster>` → `{children}` → `GlobalLoadingOverlay` →
+`SessionExpiredDialog`. **`<Toaster>` stays first**: mounted after the page, it misses
+every toast raised while the page mounts. Only add a provider here if it is **truly global**. Auth state syncs in
 `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps unauthenticated pages from
 firing `/api/auth/me`.
 
@@ -216,6 +217,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
   elements. Style buttons with `<Button variant size>`, never a class string. Icons:
   `lucide-react`, sized `size-4`/`size-3.5`.
 - Import order: external packages → `@/lib/*` → `@/components/*` → relative `./`.
+- Anything that portals takes its z-index from the ladder in `globals.css`
+  (`z-(--z-modal)` / `--z-dialog` / `--z-popper` / `--z-tooltip`), **never a bare `z-50`**.
+  A `<Select>` inside a `<Modal>` used to open behind it.
 - **Rebrand by editing the token values in `:root` and `.dark`.** Nothing else.
 
 ## 11. TypeScript
@@ -239,6 +243,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
   (parses as UTC midnight → off-by-one west of UTC). ESLint blocks both.
 - Pass an explicit zone: **`useDisplayTimeZone()`** for instants, **`useBusinessTimeZone()`**
   for business-date inputs.
+- **The defaults are India**: `DEFAULT_TIME_ZONE = "Asia/Kolkata"`, a 12-hour clock,
+  `NUMBER_LOCALE = "en-IN"` (₹12,75,000) and `DEFAULT_CURRENCY = "INR"`. Change them once, in
+  `date-utils.ts` and `numeric/`, for a project outside India. Never per call site.
 - **All money and quantity formatting goes through `@/lib/numeric`.** Values are decimal
   **strings**; arithmetic uses `big.js` (`toBig`, `sumMoney`, `lineTotal`). Never
   `Intl.NumberFormat` at a call site.

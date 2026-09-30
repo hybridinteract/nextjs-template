@@ -15,13 +15,19 @@ Big.PE = 21; // …and up to 1e21
  *
  * `Intl.NumberFormat(undefined, …)` follows the viewer's device: a German-locale
  * browser renders 1234.5 as "1.234,5", so the same invoice reads as a different
- * amount depending on who opens it. Same reasoning as `date-utils`, which pins
- * "en-GB" for exactly this. Grouping with commas, decimals with a point.
+ * amount depending on who opens it. So it is pinned, the way `date-utils` pins
+ * a locale for dates.
+ *
+ * **"en-IN", because every project built on this template so far is Indian.**
+ * Indian grouping puts the separators at the lakh and the crore: ₹12,75,000, not
+ * ₹1,275,000. That is how staff and clients read an amount, and how a Python
+ * backend's Indian formatter writes it. Both Influen and Herbally IP switched from
+ * the old "en-GB" by hand. Commas, a decimal point, and ₹ for INR.
  *
  * Change this once, here, if your app's numbers should read differently. Do not
  * add a per-call-site `locale` argument — that is how the split comes back.
  */
-export const NUMBER_LOCALE = "en-GB";
+export const NUMBER_LOCALE = "en-IN";
 
 /** Coerce any wire value to a Big, treating null/""/whitespace/garbage as 0. */
 export function toBig(value: string | number | null | undefined): Big {
