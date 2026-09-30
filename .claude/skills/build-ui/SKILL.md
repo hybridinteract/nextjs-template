@@ -49,5 +49,5 @@ colour is a token in `globals.css`, set in both `:root` and `.dark`.
 
 - `npm run type-check && npm run lint && npm test && npm run build` all pass. A
   lint error here is usually a design rule. Fix it, never disable it.
-- Look at the screen in both themes, at laptop and phone width, next to a screen
-  that already exists. If it looks like a different app, it is wrong.
+- Look at the screen in both themes (Ctrl+K, then "Switch to dark mode"), at
+  laptop and phone width, next to a screen that already exists. If it looks like a different app, it is wrong.

@@ -36,7 +36,8 @@ Claude Code reads `CLAUDE.md` by itself. Point any other AI tool at it.
    production.
 
    Then open [/dashboard/design](http://localhost:3000/dashboard/design). It shows every
-   shared part the template has, in both themes. Build screens by copying from it.
+   shared part the template has. Build screens by copying from it. Press Ctrl+K (⌘K on a
+   Mac) for the command palette: it jumps to any page and switches to dark mode.
 
 4. When your FastAPI backend is running, set `NEXT_PUBLIC_API_URL` in `.env`, then:
 

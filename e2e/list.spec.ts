@@ -65,3 +65,56 @@ test("numbers and dates render through the shared layers", async ({ page }) => {
   // A business date must not shift with the viewer's timezone.
   await expect(visibleText(page, "01 Jul 2026").first()).toBeVisible();
 });
+
+// ── Filters ──────────────────────────────────────────────────────────────────
+// The fixture has five filters, so its Filters button opens the panel. The
+// counts are the fixture's own rows, filtered the way a backend would.
+
+test("the filter panel drafts, and one Apply writes every filter", async ({ page }) => {
+  await goToList(page);
+  await page.getByRole("button", { name: "Filters" }).click();
+  const panel = page.getByRole("dialog", { name: "Filters" });
+
+  await panel.getByRole("group", { name: "Status" }).getByRole("button", { name: "Active" }).click();
+  await panel.getByRole("group", { name: "Status" }).getByRole("button", { name: "Draft" }).click();
+  await panel.getByRole("group", { name: "In stock" }).getByRole("button", { name: "Yes" }).click();
+  await panel.getByLabel("Price minimum").fill("1500");
+
+  // Nothing reaches the URL, or the list, until Apply.
+  await expect(page).not.toHaveURL(/f_status/);
+  await panel.getByRole("button", { name: "Apply 3 filters" }).click();
+
+  // Two statuses in one key, which apiParams sends as a repeated param. If it
+  // sent "active,draft" as one value, nothing would match.
+  await expect(page).toHaveURL(/widgets\.f_status=active%2Cdraft/);
+  await expect(page).toHaveURL(/widgets\.f_price=1500%7C/);
+  await expect(visibleText(page, "11 widgets")).toBeVisible();
+});
+
+test("a pill removes its own filter and leaves the rest", async ({ page }) => {
+  await goToList(page, "?widgets.f_status=active%2Cdraft&widgets.f_in_stock=true");
+  await expect(visibleText(page, "24 widgets")).toBeVisible();
+
+  await page.getByRole("button", { name: "Remove Status filter" }).click();
+  await expect(page).not.toHaveURL(/f_status/);
+  await expect(page).toHaveURL(/widgets\.f_in_stock=true/);
+  await expect(visibleText(page, "35 widgets")).toBeVisible();
+});
+
+test("a crossed range says why nothing can match", async ({ page }) => {
+  await goToList(page);
+  await page.getByRole("button", { name: "Filters" }).click();
+  const panel = page.getByRole("dialog", { name: "Filters" });
+  await panel.getByLabel("Price minimum").fill("2000");
+  await panel.getByLabel("Price maximum").fill("1000");
+  await expect(panel.getByText("The minimum is above the maximum")).toBeVisible();
+});
+
+test("with a few filters, the dropdown applies each change at once", async ({ page }) => {
+  await goToList(page, "?mode=few");
+  await page.getByRole("button", { name: "Filters" }).click();
+  await page.getByRole("group", { name: "Status" }).getByRole("button", { name: "Archived" }).click();
+
+  await expect(page).toHaveURL(/widgets\.f_status=archived/);
+  await expect(visibleText(page, "15 widgets")).toBeVisible();
+});

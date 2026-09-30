@@ -19,6 +19,12 @@ whose output you can keep.
 
 ### Fixed
 
+- **Nothing in the app could switch to dark mode.** The theme defaulted to light, and no
+  control changed it, so the dark tokens were reachable only by editing localStorage. The
+  command palette now has "Switch to dark mode". See Added.
+- **A list no longer says "0 widgets" while it loads, or after it fails.** `total` is 0
+  in both cases, and 0 is a wrong answer, not a missing one. The count waits for an answer.
+  From Influen.
 - **Escape on a dropdown inside a `<Modal>` no longer closes the whole panel.** Radix
   closes its own layer on Escape and marks the key handled, and the Modal closed as well,
   so backing out of a Select threw the panel away. The delete confirm and every popover
@@ -112,6 +118,13 @@ whose output you can keep.
   production build the home page loads 181KB of script gzipped, against 214KB with them in
   the root layout. One catch: a toast raised just before sign-in or sign-out moves you
   between groups is lost with the old toaster. Say it on the page you land on.
+- **A `daterange` filter now needs `fromKey` and `toKey`**, the backend params its two
+  halves go to. Before, the joined `"from|to"` string went to the backend under `key`, and
+  page code had to split it. Existing code fails to type-check until you add the two keys
+  and pass `filters` to `useDataView`, and then the manual split can go.
+- **`ncube remove` skips an edit to a file another removed part already deleted.**
+  `reference` edits the DataView files, and `data-view` deletes them, so either order now
+  works. A file that is missing for any other reason still stops the command.
 - **`QueryProvider` keeps one query client per browser tab**, and a new one per request on
   the server. With a client per mount, the split above threw away the `/me` that sign-in
   fetches ahead, and the dashboard mounted with no user and fetched it again. Influen split its providers that way and has this bug. A Playwright test
@@ -147,6 +160,19 @@ whose output you can keep.
   plain header with a "Sign in" link, a footer and a placeholder home page, and mounts no
   providers. Influen and Herbally IP both added one. `node ncube.js remove site` takes it
   out, the eighth removable part.
+- **DataView filters from Influen**: `multiselect`, `reference` (searched on the server,
+  from a rule 13 options feed), `numberrange` (with one-click bands) and `boolean` (Any,
+  Yes, No), beside `select` and `daterange`. Past four filters the Filters button opens a
+  panel that drafts and applies in one URL write, and asks before throwing a draft away.
+  Applied filters show as pills, each removable. A filter can take a `group` heading and a
+  `hint` line. Influen's 180-line control is split into one small component per type, and
+  its card layout, arrival defaults and filter search are left out (rule 07 §4 says why).
+- **Two sort options can share a field**, for "Newest first" and "Oldest first", by
+  setting `order`. They used to share one React key.
+- **A command palette.** Ctrl+K (⌘K on a Mac), or the search button in the sidebar or the
+  phone's top bar. It lists the sidebar's pages after the permission filter, and switches
+  the theme. Herbally IP's, with Influen's capture-phase shortcut, so it opens even from
+  inside a search box. `cmdk` was already a dependency.
 - **The sign-in pages are `noindex`**, set once in the `(auth)` layout, so a search for
   the product never lands on a login form.
 

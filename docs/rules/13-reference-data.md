@@ -1,7 +1,7 @@
 # Reference Data & Pickers
 
 > Read this before you add a dropdown, a filter, or a column showing another module's name.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §13.
 
@@ -41,6 +41,8 @@ comes from being that narrow, not from a gate.
 - Narrowing what may be offered (a `statuses` filter, a `role`) is fine. **Widening the
   response is not.**
 - Write thin wrappers over `<ReferencePicker>`, never a new picker component.
+- **A list filtered by a related record uses DataView's `reference` filter**, which reads the
+  same feed (rule 07). Never a `select` filter filled from a module's list hook.
 
 ## 3. How it works here
 
@@ -105,13 +107,14 @@ a gated list.
 
 ```bash
 # Pickers reading a gated module list. Expect zero in shared/.
-grep -rn "use[A-Z][a-zA-Z]*(" src/components/shared/ | grep -v "useReferenceOptions\|useState\|useMemo\|useCallback\|useEffect\|useRef"
+grep -rn "use[A-Z][a-zA-Z]*(" src/components/shared/ | grep -v "useReferenceOptions\|useState\|useMemo\|useCallback\|useEffect\|useRef\|useId"
 ```
 
 ```bash
 # Cross-module list hooks in components. Each hit must be that module's own
 # register page, or a gated read guarded by `enabled` / usePermission.
-grep -rn "use[A-Z][a-zA-Z]*(\{" src/components/ --include="*.tsx" | grep -v "components/shared/"
+# (-E: before 30 Sep 2026 this was "(\{", which grep refuses as unbalanced braces.)
+grep -rnE "use[A-Z][a-zA-Z]*\(\{" src/components/ --include="*.tsx" | grep -v "components/shared/\|useFormState"
 ```
 
 ```bash

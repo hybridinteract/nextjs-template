@@ -152,6 +152,11 @@ const { data, isLoading, isPending, error, refetch } = useOrders(dv.apiParams);
   when a page has two tables. Backend does the actual search/sort/paginate.
 - **Pass `isPending`, `error` and `onRetry` — all three.** Without them a failed list renders
   as an empty table ("there is no data"), and a slow one flashes the empty state.
+- Filter types: `select`, `multiselect`, `reference`, `daterange`, `numberrange`, `boolean`.
+  **A multi-select, reference or range filter needs `filters` passed to `useDataView` too**,
+  or `apiParams` sends the joined string. A multi-select or reference filter needs a backend
+  param that takes a list. Past four filters the Filters button opens a panel that applies in
+  one write. Applied filters show as removable pills.
 - `useSearchParams` needs dynamic rendering — already handled by
   `app/(dashboard)/dashboard/layout.tsx` exporting `dynamic = "force-dynamic"`.
 
@@ -171,6 +176,10 @@ const { data, isLoading, isPending, error, refetch } = useOrders(dv.apiParams);
 - Reach for `@/components/shared` before writing a new control. **That barrel cannot be
   imported from a Server Component** — `lazy.tsx` calls `dynamic(…, { ssr: false })`. From a
   `page.tsx`, import by the component's own path.
+
+**Command palette.** Ctrl+K (⌘K on a Mac), or the search button in the sidebar, opens it. It
+lists `dashboardNavItems` after the permission filter, so a new page in the sidebar is in the
+palette with no extra work. It is also the only place to switch between light and dark.
 
 **Navigation config.** `app/(dashboard)/config.ts` is pure data — **zero JSX, zero hooks**. It
 owns `dashboardNavItems` (each with `permission`/`permissions` and a `group` label that sets

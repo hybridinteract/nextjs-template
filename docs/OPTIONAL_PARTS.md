@@ -81,8 +81,14 @@ Ungated dropdown feeds and the shared <ReferencePicker>.
 |---|---|
 | `src/lib/reference` | deleted |
 | `src/components/shared/reference-picker.tsx` | deleted |
+| `src/components/data-view/reference-filter.tsx` | deleted |
 | `docs/rules/13-reference-data.md` | deleted, with its row in the rules index. Links to it become plain text |
 | `src/components/shared/index.ts` | edited |
+| `src/components/data-view/types.ts` | edited |
+| `src/components/data-view/use-data-view.ts` | edited |
+| `src/components/data-view/filter-fields.tsx` | edited |
+| `src/components/data-view/filter-pills.tsx` | edited |
+| `src/components/data-view/index.ts` | edited |
 
 ---
 
@@ -147,7 +153,7 @@ The browser suite, its mock backend, and the fixture route the shared-system tes
 
 ## `dark-mode` — Dark mode
 
-next-themes and the theme-aware toast surface.
+next-themes, the theme-aware toast surface and the palette's theme switch.
 
 **Remove when:** The product is light-only by design.
 
@@ -155,8 +161,10 @@ next-themes and the theme-aware toast surface.
 
 | What | Action |
 |---|---|
+| `src/components/layout/theme-command.tsx` | deleted |
 | `src/app/layout.tsx` | edited |
 | `src/components/ui/sonner.tsx` | edited |
+| `src/components/layout/command-palette.tsx` | edited |
 | `next-themes` | dependency dropped |
 
 ---
