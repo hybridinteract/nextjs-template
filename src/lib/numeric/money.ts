@@ -4,6 +4,17 @@ import { Big, NUMBER_LOCALE, toBig, type MoneyString } from "./decimal";
 // not configurable — a per-call decimal count is a display concern, not storage.
 const MONEY_DP = 2;
 
+/**
+ * The currency to pass when the record does not carry its own.
+ *
+ * `formatMoney` still takes the currency as an argument, and leaving it out still
+ * gives a plain grouped number. That is on purpose: when the backend sends a
+ * currency with each row, pass that instead. This is for the app that only ever
+ * deals in one, so the code says `DEFAULT_CURRENCY` rather than "INR" in forty
+ * places. Change it once, here, for a project outside India.
+ */
+export const DEFAULT_CURRENCY = "INR";
+
 /** Round to 2 dp, ROUND_HALF_UP — matches a backend `quantize_money`. */
 export function quantizeMoney(value: Big | string | number): MoneyString {
   return toBig(value as string)

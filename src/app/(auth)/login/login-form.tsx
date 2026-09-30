@@ -1,14 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useLogin } from "@/lib/auth";
+import { useLogin, useSessionStore } from "@/lib/auth";
 import { loginFormSchema, type LoginFormValues } from "@/lib/auth/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/shared/form-fields";
 
 export function LoginForm() {
+  // "Your session has ended" means nothing on the page where you sign in. The
+  // dialog is mounted in the root layout, so it would otherwise follow you here
+  // and sit on top of this form. `clearExpired`, not `reset`: the sign-out flag
+  // has to outlive this mount (see session-store.ts).
+  useEffect(() => {
+    useSessionStore.getState().clearExpired();
+  }, []);
+
   const { mutate: login, isPending } = useLogin();
 
   const {

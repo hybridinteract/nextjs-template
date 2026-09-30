@@ -15,10 +15,22 @@
 //
 // Output format is fixed and locale-independent: "14 Jul 2026" (day · short-month ·
 // year), so it can never be misread as US mm/dd/yyyy. See ./timezone and
-// docs `date-and-time.md`.
+// docs/rules/12-dates-and-numbers.md.
 
-/** The app's default timezone. Fallback when no user zone is resolved. */
-export const DEFAULT_TIME_ZONE = "UTC";
+/**
+ * The app's default timezone. Fallback when no user zone is resolved.
+ *
+ * **India, because every project built on this template so far is Indian.** Unless
+ * the backend sends a zone for each user, this is the zone for everybody. Influen
+ * inherited "UTC" here and every time on screen read 5.5 hours behind: an account
+ * created at 10:44 showed as 05:14. It also decides which calendar day a new
+ * record books on, through `useBusinessTimeZone()`.
+ *
+ * Change it for a project outside India. Don't fall back to the device's zone
+ * instead: the server render and the browser disagree, and every screen that shows
+ * a time gets a hydration mismatch.
+ */
+export const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 
 const EMPTY = "—";
 
@@ -28,7 +40,11 @@ export interface DateFormatOptions {
 }
 
 export interface DateTimeFormatOptions extends DateFormatOptions {
-  /** 12-hour clock with AM/PM. Default false (24-hour). */
+  /**
+   * 12-hour clock with AM/PM. **Default true**, because India reads the clock in
+   * twelve hours and no call site passes this option, so the default is what every
+   * screen shows. Pass `false` for a screen that really wants "15:04".
+   */
   hour12?: boolean;
 }
 
@@ -55,9 +71,16 @@ function parts(
   return out;
 }
 
+// Newer ICU spells September "Sept" in en-GB, and only September. Cutting every
+// short month to three letters keeps one month in twelve from changing shape
+// when the runtime updates.
+function shortMonth(month: string): string {
+  return month.slice(0, 3);
+}
+
 function dateStr(d: Date, timeZone: string): string {
   const p = parts(d, timeZone, { day: "2-digit", month: "short", year: "numeric" });
-  return `${p.day} ${p.month} ${p.year}`;
+  return `${p.day} ${shortMonth(p.month)} ${p.year}`;
 }
 
 function timeStr(d: Date, timeZone: string, hour12: boolean): string {
@@ -78,19 +101,19 @@ export function formatDate(
   return d ? dateStr(d, timeZone) : EMPTY;
 }
 
-/** An instant's date + time in `timeZone` → "14 Jul 2026, 15:04" (or 12h with AM/PM). */
+/** An instant's date + time in `timeZone` → "14 Jul 2026, 3:04 PM" (or "15:04" with `hour12: false`). */
 export function formatDateTime(
   value: string | Date | null | undefined,
-  { timeZone = DEFAULT_TIME_ZONE, hour12 = false }: DateTimeFormatOptions = {},
+  { timeZone = DEFAULT_TIME_ZONE, hour12 = true }: DateTimeFormatOptions = {},
 ): string {
   const d = toDate(value);
   return d ? `${dateStr(d, timeZone)}, ${timeStr(d, timeZone, hour12)}` : EMPTY;
 }
 
-/** An instant's time-of-day in `timeZone` → "15:04" (or "3:04 PM" with hour12). */
+/** An instant's time-of-day in `timeZone` → "3:04 PM" (or "15:04" with `hour12: false`). */
 export function formatTime(
   value: string | Date | null | undefined,
-  { timeZone = DEFAULT_TIME_ZONE, hour12 = false }: DateTimeFormatOptions = {},
+  { timeZone = DEFAULT_TIME_ZONE, hour12 = true }: DateTimeFormatOptions = {},
 ): string {
   const d = toDate(value);
   return d ? timeStr(d, timeZone, hour12) : EMPTY;

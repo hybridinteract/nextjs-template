@@ -1,5 +1,12 @@
 import { test, expect } from "vitest";
-import { formatMoney, quantizeMoney, sumMoney, lineTotal, taxAmount } from "./money";
+import {
+  DEFAULT_CURRENCY,
+  formatMoney,
+  quantizeMoney,
+  sumMoney,
+  lineTotal,
+  taxAmount,
+} from "./money";
 import { formatQuantity, quantizeQuantity, isPositiveQuantity } from "./quantity";
 import { toBig } from "./decimal";
 
@@ -41,13 +48,20 @@ test("quantities render without their storage padding", () => {
 test("money formatting is locale-pinned, not the viewer's", () => {
   // The whole point of NUMBER_LOCALE: an invoice must read the same for everyone.
   expect(formatMoney("1234.5")).toBe("1,234.50");
-  // en-GB writes USD as "US$" to disambiguate it from other dollars. That is the
-  // pinned locale doing its job — the same string for every viewer.
-  expect(formatMoney("1234.5", "USD")).toBe("US$1,234.50");
+  expect(formatMoney("1234.5", DEFAULT_CURRENCY)).toBe("₹1,234.50");
+  expect(formatMoney("1234.5", "USD")).toBe("$1,234.50");
   // Note the NON-BREAKING space: Intl separates a currency code from the number
   // with U+00A0, not a plain space. Anything comparing these strings — a test, a
   // snapshot, a CSV export — has to know that.
   expect(formatMoney("1234.5", "AED")).toBe("AED\u00A01,234.50");
+});
+
+test("big amounts group in lakhs and crores, the way Indian readers read them", () => {
+  // en-GB wrote ₹1,275,000.00. Staff, clients and the backend's own formatter all
+  // write ₹12,75,000.00. Both Influen and Herbally IP changed the locale for this.
+  expect(formatMoney("1275000", DEFAULT_CURRENCY)).toBe("₹12,75,000.00");
+  expect(formatMoney("15262500", DEFAULT_CURRENCY)).toBe("₹1,52,62,500.00");
+  expect(formatQuantity("1234567.5")).toBe("12,34,567.5");
 });
 
 test("garbage in is zero, not NaN", () => {

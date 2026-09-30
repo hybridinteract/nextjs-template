@@ -9,9 +9,16 @@ import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Field, DetailRow } from "@/components/shared";
 import { isFormDirty } from "@/lib/forms";
-import { formatMoney, formatQuantity } from "@/lib/numeric";
+import { DEFAULT_CURRENCY, formatMoney, formatQuantity } from "@/lib/numeric";
 import { formatBusinessDate, formatDateTime } from "@/lib/date-utils";
 import { useDisplayTimeZone } from "@/lib/timezone";
 
@@ -95,6 +102,7 @@ export function FixtureView() {
   const q = useWidgets(dv.apiParams);
   const [detail, setDetail] = useState<Widget | null>(null);
   const [name, setName] = useState("");
+  const [status, setStatus] = useState<Widget["status"]>("active");
 
   const columns: Column<Widget>[] = [
     { key: "name", header: "Name", sortable: true, mobilePrimary: true },
@@ -103,7 +111,7 @@ export function FixtureView() {
       header: "Status",
       cell: (r) => <StatusBadge label={r.status} tone={TONES[r.status]} />,
     },
-    { key: "price", header: "Price", sortable: true, cell: (r) => formatMoney(r.price, "USD") },
+    { key: "price", header: "Price", sortable: true, cell: (r) => formatMoney(r.price, DEFAULT_CURRENCY) },
     { key: "qty", header: "Qty", cell: (r) => formatQuantity(r.qty) },
     { key: "dueDate", header: "Due", cell: (r) => formatBusinessDate(r.dueDate) },
     {
@@ -128,6 +136,7 @@ export function FixtureView() {
         onRowClick={(r) => {
           setDetail(r);
           setName(r.name);
+          setStatus(r.status);
         }}
         filters={FILTERS}
         sortOptions={SORTS}
@@ -159,8 +168,11 @@ export function FixtureView() {
         onClose={() => setDetail(null)}
         title={detail?.name ?? ""}
         size="medium"
-        isDirty={isFormDirty(name, detail?.name)}
-        onDiscard={() => setName(detail?.name ?? "")}
+        isDirty={isFormDirty({ name, status }, detail && { name: detail.name, status: detail.status })}
+        onDiscard={() => {
+          setName(detail?.name ?? "");
+          setStatus(detail?.status ?? "active");
+        }}
         footer={
           <div className="flex justify-end gap-2 p-4">
             <Button size="sm">Save</Button>
@@ -175,9 +187,25 @@ export function FixtureView() {
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
+          {/* A select inside the modal, so the suite has one to drive. Both
+              portal to document.body, and a select that paints behind the
+              panel looks like a dead control. See the z-index layers in
+              globals.css. */}
+          <Field label="Status">
+            <Select value={status} onValueChange={(v) => setStatus(v as Widget["status"])}>
+              <SelectTrigger className="w-full" aria-label="Status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
           <div className="rounded-lg border p-3">
             <DetailRow label="Status" value={detail?.status} />
-            <DetailRow label="Price" value={detail && formatMoney(detail.price, "USD")} />
+            <DetailRow label="Price" value={detail && formatMoney(detail.price, DEFAULT_CURRENCY)} />
             <DetailRow label="Quantity" value={detail && formatQuantity(detail.qty)} />
             <DetailRow label="Due" value={detail && formatBusinessDate(detail.dueDate)} />
             <DetailRow label="Notes" value={null} />

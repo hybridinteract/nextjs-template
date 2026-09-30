@@ -62,10 +62,12 @@ npm install
 node ncube.js init          # or: node ncube.js init my-app-name
 ```
 
-This does three things in one step:
+This does two things in one step:
 - Sets the project name in `package.json`
 - Creates `.env` from `.env.example` (with your app name pre-filled)
-- Installs all shadcn/ui components into `src/components/ui/`
+
+It also installs the shadcn/ui components, but only if `src/components/ui/` is missing.
+They are committed to the template, so on a normal clone that step is skipped.
 
 ### 5. Configure your backend URL
 
@@ -203,20 +205,6 @@ backend, so it runs with nothing else running.
 
 ---
 
-## Variants
-
-When you use **"Use this template"** on GitHub, you always get the **full** variant — everything included. No selection needed.
-
-| Variant | Includes | How to get it |
-|---------|----------|---------------|
-| `full` *(default via template)* | Auth + full RBAC + access-control admin panel | Use GitHub "Use this template" |
-| `rbac` | Auth + full RBAC, no admin panel | Use template → delete `src/app/(dashboard)/access-control/` |
-| `base` | Auth + layout shell, no RBAC | Use template → delete `src/lib/permissions/` and `src/app/(dashboard)/access-control/` |
-
-> For local bootstrapping (deprecated), the `create` command still supports `--variant base|rbac|full`.
-
----
-
 ## NCube CLI — Domain Scaffolding
 
 The `ncube.js` CLI mirrors the FastAPI `fcube.py` module generator. It scaffolds complete feature domains following the architecture conventions.
@@ -279,7 +267,8 @@ After running, follow the printed checklist to:
 □ 4. Add form fields in src/components/<name>/<name>-form.tsx  (RHF + zod)
 □ 5. Pass isDirty on the detail modal, and clear it on open
 □ 6. Add PermissionedNavItem + ROUTES to src/app/(dashboard)/config.ts
-□ 7. Add permission keys to src/lib/permissions/types.ts and helpers.ts
+□ 7. Add permission keys to PERMISSIONS in src/lib/permissions/types.ts,
+      and map them in PERMISSION_MAPPING in src/lib/permissions/check.ts
 □ 8. If anything else picks this module by id, add it to REFERENCE_RESOURCES
 □ 9. npm run type-check && npm run lint && npm test && npm run build
 ```

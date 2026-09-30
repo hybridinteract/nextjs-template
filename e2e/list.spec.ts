@@ -61,7 +61,7 @@ test("numbers and dates render through the shared layers", async ({ page }) => {
   await goToList(page);
   // Quantities are stored at 3dp — a raw wire string would read "1990.000".
   await expect(visibleText(page, "1,990").first()).toBeVisible();
-  await expect(visibleText(page, "US$1,234.50").first()).toBeVisible();
+  await expect(visibleText(page, "₹1,234.50").first()).toBeVisible();
   // A business date must not shift with the viewer's timezone.
   await expect(visibleText(page, "01 Jul 2026").first()).toBeVisible();
 });

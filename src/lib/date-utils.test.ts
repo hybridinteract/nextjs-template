@@ -18,6 +18,14 @@ test("a business date never shifts, whatever the viewer's zone", () => {
   expect(formatBusinessDate("2026-12-31")).toBe("31 Dec 2026");
 });
 
+test("September is three letters, like every other month", () => {
+  // Newer ICU spells September "Sept" in en-GB, and only September. A runtime
+  // update would then change one month in twelve: "05 Sept 2026" beside
+  // "05 Jun 2026". Herbally IP caught it.
+  expect(formatBusinessDate("2026-09-05")).toBe("05 Sep 2026");
+  expect(formatDate("2026-09-05T06:00:00Z", { timeZone: "UTC" })).toBe("05 Sep 2026");
+});
+
 test("a business date accepts a full ISO string and ignores the time", () => {
   expect(formatBusinessDate("2026-07-15T23:30:00Z")).toBe("15 Jul 2026");
 });
@@ -37,11 +45,21 @@ test("an instant renders in the zone it is given", () => {
   expect(formatDate(instant, { timeZone: "America/New_York" })).toBe("14 Jul 2026");
 });
 
-test("times render 24-hour by default and 12-hour on request", () => {
+test("times render 12-hour by default and 24-hour on request", () => {
+  // No call site passes `hour12`, so the default is what every screen shows.
   const instant = "2026-07-14T15:04:00Z";
-  expect(formatTime(instant, { timeZone: "UTC" })).toBe("15:04");
-  expect(formatTime(instant, { timeZone: "UTC", hour12: true })).toBe("3:04 PM");
-  expect(formatDateTime(instant, { timeZone: "UTC" })).toBe("14 Jul 2026, 15:04");
+  expect(formatTime(instant, { timeZone: "UTC" })).toBe("3:04 PM");
+  expect(formatTime(instant, { timeZone: "UTC", hour12: false })).toBe("15:04");
+  expect(formatDateTime(instant, { timeZone: "UTC" })).toBe("14 Jul 2026, 3:04 PM");
+});
+
+test("with no zone given, an instant renders in India time, not UTC", () => {
+  // The default zone is the zone for everybody unless the backend sends one per
+  // user. Influen inherited UTC and every time on screen read 5.5 hours behind.
+  // 15:04 UTC is 20:34 in Kolkata.
+  expect(formatDateTime("2026-07-14T15:04:00Z")).toBe("14 Jul 2026, 8:34 PM");
+  // 21:00 UTC is already the next day in India.
+  expect(formatDate("2026-07-14T21:00:00Z")).toBe("15 Jul 2026");
 });
 
 test("toDateString gives the calendar day in the zone, not the UTC day", () => {

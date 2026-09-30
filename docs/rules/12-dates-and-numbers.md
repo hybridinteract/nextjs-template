@@ -1,7 +1,7 @@
 # Dates, Times & Numbers
 
 > Read this before you render a date or a number a user will read.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §12.
 
@@ -59,7 +59,7 @@ misread as mm/dd/yyyy.
 
 ```ts
 const tz = useDisplayTimeZone();
-formatDateTime(row.createdAt, { timeZone: tz });   // "14 Jul 2026, 21:00"
+formatDateTime(row.createdAt, { timeZone: tz });   // "14 Jul 2026, 9:00 PM"
 formatBusinessDate(row.dueDate);                   // "15 Jul 2026", everywhere
 ```
 
@@ -72,19 +72,34 @@ formatBusinessDate(row.dueDate);                   // "15 Jul 2026", everywhere
   because it is the seam: a multi-branch app resolves it from the active branch and no call
   site changes.
 
-`DEFAULT_TIME_ZONE` ships as `"UTC"`; set it in `src/lib/date-utils.ts`.
+`DEFAULT_TIME_ZONE` ships as `"Asia/Kolkata"`, because every project on this template so
+far is Indian. Unless the backend sends a zone for each user, this default is the zone for
+everybody. Influen inherited `"UTC"` and every time on screen read 5.5 hours behind. For a
+project outside India, change it once in `src/lib/date-utils.ts`.
+
+Times are **12-hour by default** ("9:00 PM"). No call site passes `hour12`, so the default
+is what every screen shows. Pass `hour12: false` where a screen really wants "21:00".
+
+The short month is always three letters. Newer ICU spells September "Sept" in `en-GB`, so
+`date-utils` cuts every month to three to keep the format fixed.
 
 ### Numbers
 
 | File | Responsibility |
 |---|---|
 | `numeric/decimal.ts` | `toBig`, `NUMBER_LOCALE`, the `MoneyString` / `QuantityString` types. |
-| `numeric/money.ts` | 2 dp. `quantizeMoney`, `lineTotal`, `taxAmount`, `sumMoney`, `formatMoney`. |
+| `numeric/money.ts` | 2 dp. `DEFAULT_CURRENCY`, `quantizeMoney`, `lineTotal`, `taxAmount`, `sumMoney`, `formatMoney`. |
 | `numeric/quantity.ts` | 3 dp. `quantizeQuantity`, `isPositiveQuantity`, `formatQuantity`. |
 
-`NUMBER_LOCALE` is pinned to `en-GB`. Change it once, there, if your app's numbers should
-read differently. Do not add a per-call-site locale argument — that is how the split comes
-back.
+`NUMBER_LOCALE` is pinned to `en-IN`, so amounts group in lakhs and crores: ₹12,75,000.00,
+not ₹1,275,000.00. Both Influen and Herbally IP switched to it by hand from the old `en-GB`.
+Change it once, there, if your app's numbers should read differently. Do not add a
+per-call-site locale argument — that is how the split comes back.
+
+`DEFAULT_CURRENCY` is `"INR"`. Pass it to `formatMoney` when the record carries no currency
+of its own, so the code never spells "INR" in forty places. When the backend sends a
+currency with each row, pass that instead. Leaving the currency out gives a plain grouped
+number, on purpose.
 
 Rounding is **half up**, matching a typical backend `quantize_money`. Quantities are stored
 at 3 dp, so the padding is storage, not information.

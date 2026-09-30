@@ -11,12 +11,53 @@ Follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ---
 
+## [Unreleased]
+
+Fixes that Influen and Herbally IP found after they were built from 0.2.0, and defaults
+that match the projects this template is actually used for.
+
+### Fixed
+
+- **A `<Select>`, dropdown, popover or tooltip opened inside a `<Modal>` now opens on top
+  of it.** The modal sat at `z-[100]` and every popper at `z-50`, so the option list painted
+  behind the panel and the control looked dead. Every portalled layer now takes its z-index
+  from a named ladder in `globals.css` (`--z-modal`, `--z-dialog`, `--z-popper`,
+  `--z-tooltip`). A Playwright test clicks an option inside a modal and checks it is the
+  topmost element. It failed before the fix, on desktop and mobile.
+- **September prints as "Sep", like every other month.** Newer ICU spells it "Sept" in
+  `en-GB`, and only that month. `date-utils` now cuts every short month to three letters.
+- **The login route no longer passes FastAPI's raw `detail` through as the message.** On a
+  422 that is a list of issues, not a sentence. A new `detailToMessage`
+  (`src/lib/backend-error.ts`) turns a string, a 422 issue list or a `{ message }` object
+  into words. The api-client uses it too, so a `{ message }` refusal no longer shows as
+  "Request failed with status 403".
+- **`<Toaster>` is mounted first, not last.** Sonner's Toaster only shows toasts raised
+  after its own effect subscribes, and React runs later siblings' effects later. A toast
+  raised while a page mounted went nowhere.
+- **A deliberate sign-out can no longer raise "Your session has ended".** The session
+  store has an `isSigningOut` flag, raised before the logout request. The plain template
+  did not show this, but Influen did as soon as its logout cleared a saved store, and so
+  would any project that follows rule 17 and clears things on logout.
+- Four links to `docs/TEMPLATE_UPDATE_PLAN.md`, removed in the last release, now point to
+  git history. The README's Variants table, which described an admin panel that does not
+  exist, is gone. The README checklist named a `permissions/helpers.ts` that does not exist.
+
+### Changed
+
+- **The defaults are India.** `DEFAULT_TIME_ZONE` is `"Asia/Kolkata"` (was `"UTC"`), times
+  are 12-hour by default, and `NUMBER_LOCALE` is `"en-IN"` (was `"en-GB"`), so amounts group
+  as ₹12,75,000. New `DEFAULT_CURRENCY = "INR"` in `@/lib/numeric`. Influen inherited UTC and
+  every time on screen read 5.5 hours behind. Both projects switched the locale by hand.
+  For a project outside India, change the three constants once.
+
+---
+
 ## [0.2.0] — 2026-08-19
 
 Rebuilt most of the shared infrastructure from a production app this template seeded,
-and fixed two things that had never worked. See
-[`docs/TEMPLATE_UPDATE_PLAN.md`](docs/TEMPLATE_UPDATE_PLAN.md) for the reasoning and for
-what was deliberately left behind.
+and fixed two things that had never worked. The plan behind it, with the reasoning and
+what was deliberately left behind, was removed once the work was done. Read it with
+`git show 7086b93:docs/TEMPLATE_UPDATE_PLAN.md`.
 
 ### Fixed
 

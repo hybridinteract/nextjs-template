@@ -1,7 +1,7 @@
 # Styling — semantic tokens only
 
 > Read this before you write a colour.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §10.
 
@@ -31,6 +31,12 @@ twice — once per theme — so the same class means the right thing in both.
   `Checkbox`…). Do not restyle a native element to look like one.
 - Style buttons with `<Button variant size>`, never a hand-written class string.
 - Icons come from `lucide-react`, sized with `size-4` / `size-3.5`.
+- **Anything that portals to `document.body` takes its z-index from the ladder in
+  `globals.css`**: `z-(--z-modal)`, `z-(--z-dialog)`, `z-(--z-popper)`, `z-(--z-tooltip)`.
+  Never a bare `z-50` or `z-[100]`. The rule is that a layer opened from inside another
+  sits above it. Radix's Portal creates no stacking context, so a popper competes directly
+  with the panel it opened from. When `<Modal>` sat at `z-[100]` and the poppers at `z-50`,
+  a `<Select>` inside a modal opened behind it and looked dead. `e2e/modal.spec.ts` guards it.
 - Import order, seen throughout: external packages → `@/lib/*` → `@/components/*` →
   relative `./`.
 
@@ -88,6 +94,13 @@ grep -rnE "(text|bg|border|ring|fill|stroke)-(red|green|blue|amber|yellow|orange
 ```
 
 ```bash
+# A bare z-index on something that portals. Expect only avatar.tsx (z-10, in-page),
+# the blocking overlay (z-[9999], meant to cover everything) and the discard
+# prompt inside the modal (z-20, in-page).
+grep -rnoE "z-\[[0-9]+\]|z-[0-9]+\b" src/components
+```
+
+```bash
 # Inline hex. Expect zero — global-error.tsx is the one sanctioned exception
 # (it renders without the stylesheet; see section 4).
 grep -rnE "#[0-9A-Fa-f]{3,8}\b" src/ --include="*.tsx" | grep -v "global-error.tsx"
@@ -96,9 +109,9 @@ grep -rnE "#[0-9A-Fa-f]{3,8}\b" src/ --include="*.tsx" | grep -v "global-error.t
 ```bash
 # Every COLOUR token defined in :root is also defined in .dark. A colour that
 # exists in only one theme is unreadable in the other.
-# `--radius` is deliberately light-only: a corner radius does not change with
-# the theme, so it is excluded here.
-diff <(sed -n '/^:root {/,/^}/p' src/app/globals.css | grep -oE "^\s+--[a-z0-9-]+" | tr -d ' ' | grep -v "^--radius$" | sort) \
+# `--radius` and the `--z-*` stacking layers are deliberately light-only: neither
+# a corner radius nor a stacking order changes with the theme.
+diff <(sed -n '/^:root {/,/^}/p' src/app/globals.css | grep -oE "^\s+--[a-z0-9-]+" | tr -d ' ' | grep -vE "^--(radius|z-[a-z]+)$" | sort) \
      <(sed -n '/^\.dark {/,/^}/p' src/app/globals.css | grep -oE "^\s+--[a-z0-9-]+" | tr -d ' ' | sort) \
   && echo "in step"
 ```
