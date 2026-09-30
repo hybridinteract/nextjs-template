@@ -282,7 +282,7 @@ browser.
 | `/api/auth/login` | POST | Passes login to the backend, sets the cookies (access 2 hours, refresh 7 days) |
 | `/api/auth/me` | GET | Returns the current user, and refreshes quietly if the access token expired |
 | `/api/auth/refresh` | POST | Rotates both tokens |
-| `/api/auth/logout` | POST | Clears the cookies |
+| `/api/auth/logout` | POST | Revokes the session on the backend, then clears the cookies |
 
 ---
 

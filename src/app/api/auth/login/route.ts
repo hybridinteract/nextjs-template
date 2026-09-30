@@ -5,15 +5,17 @@ import { detailToMessage } from "@/lib/backend-error";
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
 
+  // The backend template's email/password provider, JSON in. Until 30 Sep 2026
+  // this posted an OAuth2 form to /auth/login, which the backend dropped on
+  // 8 Jun 2026, so sign-in failed against every backend made since.
   const backendRes = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/password/login`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        username: body.email ?? "",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: body.email ?? "",
         password: body.password ?? "",
-        grant_type: "password",
       }),
     },
   );

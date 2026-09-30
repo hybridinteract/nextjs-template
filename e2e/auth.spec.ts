@@ -56,6 +56,26 @@ test("signing out does not tell you your session ended", async ({ page, isMobile
   await expect(page.getByText("Your session has ended")).toHaveCount(0);
 });
 
+test("signing out revokes the session on the backend, not just in the browser", async ({ page, isMobile }) => {
+  // Deleting the cookies signs you out of this browser. The refresh token is
+  // what keeps a session alive for 7 days, and until 30 Sep 2026 the logout
+  // route never sent it, so a copied token still worked after sign-out.
+  test.skip(isMobile, "The user menu is inside the nav sheet on a phone. The route is the same.");
+  await signIn(page);
+  const cookies = await page.context().cookies();
+  const refreshToken = cookies.find((c) => c.name === "refresh_token")?.value;
+  expect(refreshToken).toBeTruthy();
+
+  await page.getByRole("button", { name: /test@example\.com/ }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/);
+
+  // Put the old token back, the way someone who copied it would, and try it.
+  await page.context().addCookies([{ name: "refresh_token", value: refreshToken!, url: page.url() }]);
+  const res = await page.request.post("/api/auth/refresh");
+  expect(res.status()).toBe(401);
+});
+
 test("an authenticated API call reaches the backend through the proxy", async ({ page }) => {
   // The bug: the client called the backend origin directly, so the httpOnly
   // cookie never travelled and this 404'd or 401'd. Same-origin is the fix, and
