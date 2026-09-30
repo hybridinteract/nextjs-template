@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "//dev:mock": "The app against a fake backend that accepts any login. For before the real backend exists. See scripts/dev-mock.mjs.",
+    "dev:mock": "node scripts/dev-mock.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -14,6 +16,10 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "//test:generator": "Runs `ncube startdomain` in throwaway copies of the project and type-checks and lints the result. See scripts/test-generator.mjs.",
+    "test:generator": "node scripts/test-generator.mjs",
+    "//check:docs": "Every relative link in the markdown resolves, and every rule in docs/rules/ has a recent 'Last verified' stamp. Old stamps are warnings. See scripts/check-docs.mjs.",
+    "check:docs": "node scripts/check-docs.mjs",
     "setup": "node ncube.js setup",
     "init": "node ncube.js init"
   },

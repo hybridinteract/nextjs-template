@@ -6,13 +6,12 @@
  *
  * Commands:
  *   node ncube.js init [name]                — post-clone setup (name, .env, shadcn)
- *   node ncube.js startdomain <DomainName>   — scaffold a new feature domain
- *   node ncube.js listdomains                — list existing domains in lib/
+ *   node ncube.js startdomain <Name> [--plural <Plural>]
+ *                                            — scaffold a module and register it
+ *   node ncube.js listdomains                — list the modules in src/lib
  *   node ncube.js setup                      — install shadcn/ui components
  *   node ncube.js remove <feature>           — strip an optional subsystem cleanly
  *   node ncube.js bump <patch|minor|major>   — version + changelog entry
- *   node ncube.js create <name> [--variant base|rbac|full]
- *                                            — (deprecated) bootstrap from local template
  */
 
 const fs = require("fs");
@@ -46,12 +45,13 @@ function mkdirp(dir) {
 
 function writeFile(filePath, content) {
   mkdirp(path.dirname(filePath));
+  const shown = path.relative(process.cwd(), filePath);
   if (fs.existsSync(filePath)) {
-    warn(`Skipping (already exists): ${filePath}`);
+    warn(`Skipping (already exists): ${shown}`);
     return;
   }
   fs.writeFileSync(filePath, content, "utf8");
-  ok(`Created: ${filePath}`);
+  ok(`Created: ${shown}`);
 }
 
 function toPascalCase(str) {
@@ -72,549 +72,1010 @@ function toCamelCase(str) {
   return pascal.charAt(0).toLowerCase() + pascal.slice(1);
 }
 
-// ── Domain template generators ─────────────────────────────────────────────────
-function generateTypesFile(Domain, domain, _domainKebab) {
+// ── startdomain ────────────────────────────────────────────────────────────────
+//
+// Scaffolds one module in the shape CLAUDE.md describes: a DataView list, one
+// <Modal> that creates, views and edits, react-hook-form + zod, and no store.
+// Then it registers the route and the permission keys, so the result passes
+// type-check and lint before you touch it. `npm run test:generator` proves that,
+// with and without the optional parts it leans on.
+//
+// It writes one real field, `name`, and one status. On purpose: a module with no
+// fields teaches nothing, and your first edit renames them or adds to them.
+
+// Folders in src/lib that belong to the template, not to a feature.
+const CORE_LIB_DIRS = new Set([
+  "auth", "permissions", "loading", "hooks", "forms", "numeric", "reference", "utilities",
+]);
+
+// The sidebar icon for a new module. Change it in config.ts afterwards.
+const NAV_ICON = "LayoutList";
+
+/** "Category" → "Categories", "Branch" → "Branches", "LeadSource" → "LeadSources". */
+function pluralize(word) {
+  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh)$/i.test(word)) return `${word}es`;
+  return `${word}s`;
+}
+
+/** "LeadSource" → "Lead source". Sentence case, for labels and titles. */
+function toLabel(pascal) {
+  const words = pascal.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(" ");
+  return [words[0], ...words.slice(1).map((w) => w.toLowerCase())].join(" ");
+}
+
+/** Every spelling of one module's name, worked out once. */
+function domainNames(rawName, rawPlural) {
+  const Singular = toPascalCase(rawName);
+  const Plural = rawPlural ? toPascalCase(rawPlural) : pluralize(Singular);
+  const kebab = toKebabCase(Plural);
+  return {
+    Singular, // Category
+    Plural, // Categories
+    singular: toCamelCase(Singular), // category
+    plural: toCamelCase(Plural), // categories
+    kebab, // categories: the folders, the route and the API path
+    resource: kebab.replace(/-/g, "_"), // categories: the permission resource
+    CONST: toKebabCase(Singular).replace(/-/g, "_").toUpperCase(), // CATEGORY
+    label: toLabel(Singular), // Category
+    labelPlural: toLabel(Plural), // Categories
+    lower: toLabel(Singular).toLowerCase(), // category
+    lowerPlural: toLabel(Plural).toLowerCase(), // categories
+  };
+}
+
+/** Which optional parts are still in the project. `ncube remove` can take them out. */
+function detectFeatures(srcRoot) {
+  return {
+    permissions: fs.existsSync(path.join(srcRoot, "lib", "permissions")),
+    blocking: fs.existsSync(path.join(srcRoot, "lib", "loading")),
+    dataView: fs.existsSync(path.join(srcRoot, "components", "data-view")),
+  };
+}
+
+// ── lib/<module>/ ──────────────────────────────────────────────────────────────
+
+function generateTypesFile(n) {
   return `import { z } from "zod";
 
-// ── Constants ────────────────────────────────────────────────────────────────
-export const ${Domain.toUpperCase()}_STATUSES = ["active", "inactive"] as const;
-export type ${Domain}Status = (typeof ${Domain.toUpperCase()}_STATUSES)[number];
+// ── Status ──────────────────────────────────────────────────────────────────
+// An \`as const\` array, so \`asEnum\` and the status filter can use it at runtime.
+// Replace these with the statuses your backend really has.
+export const ${n.CONST}_STATUSES = ["active", "inactive"] as const;
+export type ${n.Singular}Status = (typeof ${n.CONST}_STATUSES)[number];
 
-export const ${Domain.toUpperCase()}_STATUS_LABELS: Record<${Domain}Status, string> = {
+export const ${n.CONST}_STATUS_LABELS: Record<${n.Singular}Status, string> = {
   active: "Active",
   inactive: "Inactive",
 };
 
-export const ${Domain.toUpperCase()}_STATUS_COLORS: Record<${Domain}Status, string> = {
-  active: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  inactive: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
-};
+export const ${n.CONST}_PAGE_SIZE = 20;
 
-export const ${Domain.toUpperCase()}_PAGE_SIZE = 20;
-
-// ── Backend shapes (match wire format exactly) ────────────────────────────────
-export interface Backend${Domain} {
+// ── Wire shapes: snake_case, exactly as the backend sends them ───────────────
+export interface Backend${n.Singular} {
   id: string;
-  // TODO: Add backend fields (snake_case)
-  status: ${Domain}Status;
+  name: string;
+  // A plain string on the wire. The backend may add a status next week.
+  status: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface Backend${Domain}ListResponse {
-  items: Backend${Domain}[];
+export interface Backend${n.Singular}ListResponse {
+  items: Backend${n.Singular}[];
   total: number;
-  skip: number;
-  limit: number;
 }
 
-// ── Frontend shapes ───────────────────────────────────────────────────────────
-export interface ${Domain} {
+// ── Frontend shapes: camelCase ───────────────────────────────────────────────
+export interface ${n.Singular} {
   id: string;
-  // TODO: Add frontend fields (camelCase)
-  status: ${Domain}Status;
+  name: string;
+  status: ${n.Singular}Status;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ${Domain}ListResult {
-  items: ${Domain}[];
+export interface ${n.Singular}ListResult {
+  items: ${n.Singular}[];
   total: number;
 }
 
-// ── Query params ──────────────────────────────────────────────────────────────
-export interface ${Domain}ListParams {
-  skip?: number;
-  limit?: number;
-  search?: string;
-  status?: ${Domain}Status | "";
-}
+/** DataView's \`apiParams\`: skip, limit, search, sort_by, sort_order and the filters. */
+export type ${n.Singular}ListParams = Record<string, string | number | undefined>;
 
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-export const ${domain}FormSchema = z.object({
-  // TODO: Add form fields
+// ── The form ────────────────────────────────────────────────────────────────
+export const ${n.singular}FormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200, "Keep it under 200 characters"),
+  status: z.enum(${n.CONST}_STATUSES),
 });
 
-export type ${Domain}FormValues = z.infer<typeof ${domain}FormSchema>;
+export type ${n.Singular}FormValues = z.infer<typeof ${n.singular}FormSchema>;
+
+// ── Payloads: snake_case, straight to the API ────────────────────────────────
+export interface Create${n.Singular}Payload {
+  name: string;
+  status: ${n.Singular}Status;
+}
+
+export type Update${n.Singular}Payload = Partial<Create${n.Singular}Payload>;
 `;
 }
 
-function generateTransformersFile(Domain, _domain) {
-  return `import type { Backend${Domain}, ${Domain}, ${Domain}FormValues } from "./types";
+function generateTransformersFile(n) {
+  return `import {
+  ${n.CONST}_STATUSES,
+  type Backend${n.Singular},
+  type ${n.Singular},
+  type ${n.Singular}FormValues,
+  type Create${n.Singular}Payload,
+} from "./types";
 
-export function transform${Domain}(raw: Backend${Domain}): ${Domain} {
+// Every module carries its own copy (docs/rules/02-wire-format.md). A cast would
+// let an unknown status through to a Record lookup and render a blank cell.
+function asEnum<T extends readonly string[]>(
+  raw: string | null | undefined,
+  allowed: T,
+  fallback: T[number],
+): T[number] {
+  return allowed.includes(raw as T[number]) ? (raw as T[number]) : fallback;
+}
+
+export function transform${n.Singular}(raw: Backend${n.Singular}): ${n.Singular} {
   return {
     id: raw.id,
-    // TODO: Map backend fields (snake_case) → frontend fields (camelCase)
-    status: raw.status,
+    name: raw.name,
+    status: asEnum(raw.status, ${n.CONST}_STATUSES, "active"),
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
 }
 
-export function toBackend${Domain}(values: Partial<${Domain}FormValues>): Record<string, unknown> {
-  const payload: Record<string, unknown> = {};
-  // TODO: Map camelCase form fields → snake_case backend fields
-  return payload;
-}
-`;
-}
-
-function generateApiFile(Domain, domain, domainKebab) {
-  return `import { apiClient } from "@/lib/api-client";
-import { transform${Domain}, toBackend${Domain} } from "./transformers";
-import type {
-  Backend${Domain},
-  Backend${Domain}ListResponse,
-  ${Domain},
-  ${Domain}FormValues,
-  ${Domain}ListParams,
-  ${Domain}ListResult,
-} from "./types";
-import { ${Domain.toUpperCase()}_PAGE_SIZE } from "./types";
-
-export async function fetch${Domain}s(params: ${Domain}ListParams = {}): Promise<${Domain}ListResult> {
-  const queryParams: Record<string, string> = {};
-  if (params.skip !== undefined) queryParams.skip = String(params.skip);
-  queryParams.limit = String(params.limit ?? ${Domain.toUpperCase()}_PAGE_SIZE);
-  if (params.search) queryParams.search = params.search;
-  if (params.status) queryParams.status = params.status;
-
-  const data = await apiClient.get<Backend${Domain}ListResponse>("/api/v1/${domainKebab}s", {
-    params: queryParams,
-  });
-  return { items: data.items.map(transform${Domain}), total: data.total };
-}
-
-export async function fetch${Domain}(id: string): Promise<${Domain}> {
-  const data = await apiClient.get<Backend${Domain}>(\`/api/v1/${domainKebab}s/\${id}\`);
-  return transform${Domain}(data);
-}
-
-export async function create${Domain}(values: ${Domain}FormValues): Promise<${Domain}> {
-  const payload = toBackend${Domain}(values);
-  const data = await apiClient.post<Backend${Domain}>("/api/v1/${domainKebab}s", payload);
-  return transform${Domain}(data);
-}
-
-export async function update${Domain}(id: string, values: Partial<${Domain}FormValues>): Promise<${Domain}> {
-  const payload = toBackend${Domain}(values);
-  const data = await apiClient.patch<Backend${Domain}>(\`/api/v1/${domainKebab}s/\${id}\`, payload);
-  return transform${Domain}(data);
-}
-
-export async function delete${Domain}(id: string): Promise<void> {
-  await apiClient.delete(\`/api/v1/${domainKebab}s/\${id}\`);
-}
-`;
-}
-
-function generateHooksFile(Domain, domain, domainKebab) {
-  return `"use client";
-
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { useBlockingMutation } from "@/lib/loading";
-import { AppError } from "@/types";
-import * as ${domain}Api from "./api";
-import type { ${Domain}ListParams, ${Domain}FormValues } from "./types";
-
-// ── Query key factory ─────────────────────────────────────────────────────────
-export const ${domain}Keys = {
-  all: ["${domainKebab}s"] as const,
-  lists: () => [...${domain}Keys.all, "list"] as const,
-  list: (params: ${Domain}ListParams) => [...${domain}Keys.lists(), params] as const,
-  detail: (id: string) => [...${domain}Keys.all, "detail", id] as const,
+/** What the create form opens with. */
+export const empty${n.Singular}Form: ${n.Singular}FormValues = {
+  name: "",
+  status: "active",
 };
 
-function handleError(err: unknown) {
-  const message = err instanceof AppError ? err.message : "An unexpected error occurred";
+/** What the edit form opens with. Unsaved-work checks compare against this. */
+export function ${n.singular}ToForm(${n.singular}: ${n.Singular}): ${n.Singular}FormValues {
+  return {
+    name: ${n.singular}.name,
+    status: ${n.singular}.status,
+  };
+}
+
+/**
+ * Form values → the snake_case payload. The zod schema has already trimmed the
+ * strings. For an optional field, send \`undefined\` rather than an empty box:
+ * \`notes: values.notes || undefined\`.
+ */
+export function formToPayload(values: ${n.Singular}FormValues): Create${n.Singular}Payload {
+  return {
+    name: values.name,
+    status: values.status,
+  };
+}
+`;
+}
+
+function generateApiFile(n) {
+  return `import { apiClient } from "@/lib/api-client";
+import { transform${n.Singular} } from "./transformers";
+import type {
+  Backend${n.Singular},
+  Backend${n.Singular}ListResponse,
+  ${n.Singular},
+  ${n.Singular}ListParams,
+  ${n.Singular}ListResult,
+  Create${n.Singular}Payload,
+  Update${n.Singular}Payload,
+} from "./types";
+
+const BASE = "/api/v1/${n.kebab}";
+
+export async function fetch${n.Plural}(params: ${n.Singular}ListParams): Promise<${n.Singular}ListResult> {
+  const data = await apiClient.get<Backend${n.Singular}ListResponse>(BASE, { params });
+  return { items: data.items.map(transform${n.Singular}), total: data.total };
+}
+
+export async function fetch${n.Singular}(id: string): Promise<${n.Singular}> {
+  const data = await apiClient.get<Backend${n.Singular}>(\`\${BASE}/\${id}\`);
+  return transform${n.Singular}(data);
+}
+
+export async function create${n.Singular}(payload: Create${n.Singular}Payload): Promise<${n.Singular}> {
+  const data = await apiClient.post<Backend${n.Singular}>(BASE, payload);
+  return transform${n.Singular}(data);
+}
+
+export async function update${n.Singular}(id: string, payload: Update${n.Singular}Payload): Promise<${n.Singular}> {
+  const data = await apiClient.patch<Backend${n.Singular}>(\`\${BASE}/\${id}\`, payload);
+  return transform${n.Singular}(data);
+}
+
+export async function delete${n.Singular}(id: string): Promise<void> {
+  await apiClient.delete(\`\${BASE}/\${id}\`);
+}
+`;
+}
+
+/**
+ * One mutation hook. With the blocking overlay it is `useBlockingMutation`;
+ * after `ncube remove blocking-loading` it is a plain `useMutation`.
+ */
+function mutationHook(f, { name, input, body, success, failure, label }) {
+  const options = `{
+      mutationFn: async (${input}) => {
+${body}
+      },
+      onSuccess: () => toast.success("${success}"),
+      onError: (err) => handleError(err, "${failure}"),
+    }`;
+  const call = f.blocking
+    ? `useBlockingMutation(\n    ${options},\n    { source: "mutation", label: "${label}" },\n  )`
+    : `useMutation(${options.replace(/\n {2}/g, "\n")})`;
+  return `export function ${name}() {
+  const queryClient = useQueryClient();
+  return ${call};
+}
+`;
+}
+
+function generateHooksFile(n, f) {
+  const reactQuery = f.blocking
+    ? "useQuery, useQueryClient"
+    : "useMutation, useQuery, useQueryClient";
+  const loadingImport = f.blocking ? `import { useBlockingMutation } from "@/lib/loading";\n` : "";
+  const create = mutationHook(f, {
+    name: `useCreate${n.Singular}`,
+    input: `values: ${n.Singular}FormValues`,
+    body: `        const created = await ${n.singular}Api.create${n.Singular}(formToPayload(values));
+        await queryClient.invalidateQueries({ queryKey: ${n.singular}Keys.lists() });
+        return created;`,
+    success: `${n.label} created`,
+    failure: `Could not create the ${n.lower}`,
+    label: `Creating ${n.lower}…`,
+  });
+  const update = mutationHook(f, {
+    name: `useUpdate${n.Singular}`,
+    input: `{ id, values }: { id: string; values: ${n.Singular}FormValues }`,
+    body: `        const updated = await ${n.singular}Api.update${n.Singular}(id, formToPayload(values));
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ${n.singular}Keys.lists() }),
+          queryClient.invalidateQueries({ queryKey: ${n.singular}Keys.detail(id) }),
+        ]);
+        return updated;`,
+    success: `${n.label} saved`,
+    failure: `Could not save the ${n.lower}`,
+    label: "Saving changes…",
+  });
+  const remove = mutationHook(f, {
+    name: `useDelete${n.Singular}`,
+    input: "id: string",
+    body: `        await ${n.singular}Api.delete${n.Singular}(id);
+        queryClient.removeQueries({ queryKey: ${n.singular}Keys.detail(id) });
+        await queryClient.invalidateQueries({ queryKey: ${n.singular}Keys.lists() });`,
+    success: `${n.label} deleted`,
+    failure: `Could not delete the ${n.lower}`,
+    label: `Deleting ${n.lower}…`,
+  });
+
+  return `"use client";
+
+import { ${reactQuery} } from "@tanstack/react-query";
+import { toast } from "sonner";
+${loadingImport}import { AppError } from "@/types";
+import * as ${n.singular}Api from "./api";
+import { formToPayload } from "./transformers";
+import type { ${n.Singular}FormValues, ${n.Singular}ListParams } from "./types";
+
+// Build every key from here, so one invalidation reaches every list.
+export const ${n.singular}Keys = {
+  all: ["${n.kebab}"] as const,
+  lists: () => [...${n.singular}Keys.all, "list"] as const,
+  list: (params: ${n.Singular}ListParams) => [...${n.singular}Keys.lists(), params] as const,
+  detail: (id: string) => [...${n.singular}Keys.all, "detail", id] as const,
+};
+
+function handleError(err: unknown, fallback: string) {
+  const message =
+    err instanceof AppError ? err.message : err instanceof Error ? err.message : fallback;
   toast.error(message);
 }
 
-// ── Query hooks ───────────────────────────────────────────────────────────────
-export function use${Domain}s(params: ${Domain}ListParams = {}) {
+// Both queries use the global 30s staleTime. Pick another tier from
+// docs/rules/04-data-fetching.md if this data changes faster or slower.
+export function use${n.Plural}(params: ${n.Singular}ListParams) {
   return useQuery({
-    queryKey: ${domain}Keys.list(params),
-    queryFn: () => ${domain}Api.fetch${Domain}s(params),
-    placeholderData: (prev) => prev,
-    staleTime: 30_000,
+    queryKey: ${n.singular}Keys.list(params),
+    queryFn: () => ${n.singular}Api.fetch${n.Plural}(params),
+    placeholderData: (previous) => previous,
   });
 }
 
-export function use${Domain}(id: string) {
+export function use${n.Singular}(id: string | null) {
   return useQuery({
-    queryKey: ${domain}Keys.detail(id),
-    queryFn: () => ${domain}Api.fetch${Domain}(id),
+    queryKey: ${n.singular}Keys.detail(id ?? ""),
+    queryFn: () => ${n.singular}Api.fetch${n.Singular}(id ?? ""),
     enabled: Boolean(id),
-    staleTime: 30_000,
   });
 }
 
-// ── Mutation hooks ────────────────────────────────────────────────────────────
-export function useCreate${Domain}() {
-  const queryClient = useQueryClient();
-  return useBlockingMutation(
-    {
-      mutationFn: async (values: ${Domain}FormValues) => {
-        const result = await ${domain}Api.create${Domain}(values);
-        await queryClient.invalidateQueries({ queryKey: ${domain}Keys.lists() });
-        return result;
-      },
-      onSuccess: () => toast.success("${Domain} created"),
-      onError: handleError,
-    },
-    { source: "mutation", label: "Creating ${Domain.toLowerCase()}…" },
-  );
+// Success toasts live here, not in the component. Invalidation goes inside the
+// mutationFn and is awaited, so the list is fresh before the panel closes.
+${create}
+${update}
+${remove}`;
 }
 
-export function useUpdate${Domain}() {
-  const queryClient = useQueryClient();
-  return useBlockingMutation(
-    {
-      mutationFn: async ({ id, values }: { id: string; values: Partial<${Domain}FormValues> }) => {
-        const result = await ${domain}Api.update${Domain}(id, values);
-        await queryClient.invalidateQueries({ queryKey: ${domain}Keys.lists() });
-        await queryClient.invalidateQueries({ queryKey: ${domain}Keys.detail(id) });
-        return result;
-      },
-      onSuccess: () => toast.success("${Domain} updated"),
-      onError: handleError,
-    },
-    { source: "mutation", label: "Saving changes…" },
-  );
-}
-
-export function useDelete${Domain}() {
-  const queryClient = useQueryClient();
-  return useBlockingMutation(
-    {
-      mutationFn: async (id: string) => {
-        await ${domain}Api.delete${Domain}(id);
-        await queryClient.invalidateQueries({ queryKey: ${domain}Keys.lists() });
-      },
-      onSuccess: () => toast.success("${Domain} deleted"),
-      onError: handleError,
-    },
-    { source: "mutation", label: "Deleting…" },
-  );
-}
-
+function generateIndexFile(n) {
+  return `export {
+  use${n.Plural},
+  use${n.Singular},
+  useCreate${n.Singular},
+  useUpdate${n.Singular},
+  useDelete${n.Singular},
+  ${n.singular}Keys,
+} from "./hooks";
+export { empty${n.Singular}Form, ${n.singular}ToForm } from "./transformers";
+export {
+  ${n.CONST}_STATUSES,
+  ${n.CONST}_STATUS_LABELS,
+  ${n.CONST}_PAGE_SIZE,
+  ${n.singular}FormSchema,
+} from "./types";
+export type {
+  ${n.Singular},
+  ${n.Singular}Status,
+  ${n.Singular}FormValues,
+  ${n.Singular}ListParams,
+} from "./types";
 `;
 }
 
-function generateStoreFile(Domain, _domain) {
-  return `"use client";
+// ── components/<module>/ ───────────────────────────────────────────────────────
 
-import { create } from "zustand";
-import type { ${Domain} } from "./types";
+function generateViewFile(n, f) {
+  const permissionImport = f.permissions ? `import { usePermission } from "@/lib/permissions";\n` : "";
+  const canCreate = f.permissions ? `  const canCreate = usePermission("${n.resource}.create");\n` : "";
+  const emptyState = f.permissions
+    ? `<Empty${n.Plural} canCreate={canCreate} onCreate={openCreate} />`
+    : `<Empty${n.Plural} onCreate={openCreate} />`;
+  const actions = f.permissions ? `canCreate ? <AddButton onClick={openCreate} /> : null` : `<AddButton onClick={openCreate} />`;
+  const emptyProps = f.permissions
+    ? "{ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }"
+    : "{ onCreate }: { onCreate: () => void }";
+  const emptyButton = f.permissions
+    ? "{canCreate && <AddButton onClick={onCreate} />}"
+    : "<AddButton onClick={onCreate} />";
 
-interface ${Domain}UIState {
-  // ── Modal state ─────────────────────────────────────────────────────────
-  is${Domain}Open: boolean;
-  editing${Domain}: ${Domain} | null;
-  isViewMode: boolean;
-  open${Domain}View: (item: ${Domain}) => void;
-  open${Domain}Form: (item?: ${Domain}) => void;
-  close${Domain}Form: () => void;
-
-  // ── Delete confirmation ──────────────────────────────────────────────────
-  deleting${Domain}: ${Domain} | null;
-  openDelete${Domain}: (item: ${Domain}) => void;
-  closeDelete${Domain}: () => void;
-
-  // ── Filters ─────────────────────────────────────────────────────────────
-  searchQuery: string;
-  setSearchQuery: (q: string) => void;
-  statusFilter: string;
-  setStatusFilter: (s: string) => void;
-}
-
-export const use${Domain}Store = create<${Domain}UIState>((set) => ({
-  is${Domain}Open: false,
-  editing${Domain}: null,
-  isViewMode: false,
-  open${Domain}View: (item) => set({ is${Domain}Open: true, editing${Domain}: item, isViewMode: true }),
-  open${Domain}Form: (item) => set({ is${Domain}Open: true, editing${Domain}: item ?? null, isViewMode: false }),
-  close${Domain}Form: () => set({ is${Domain}Open: false, editing${Domain}: null, isViewMode: false }),
-
-  deleting${Domain}: null,
-  openDelete${Domain}: (item) => set({ deleting${Domain}: item }),
-  closeDelete${Domain}: () => set({ deleting${Domain}: null }),
-
-  searchQuery: "",
-  setSearchQuery: (searchQuery) => set({ searchQuery }),
-  statusFilter: "",
-  setStatusFilter: (statusFilter) => set({ statusFilter }),
-}));
-`;
-}
-
-function generateIndexFile(Domain, domain) {
-  return `export { fetch${Domain}s, fetch${Domain}, create${Domain}, update${Domain}, delete${Domain} } from "./api";
-export { use${Domain}s, use${Domain}, useCreate${Domain}, useUpdate${Domain}, useDelete${Domain}, ${domain}Keys } from "./hooks";
-export { use${Domain}Store } from "./store";
-export type { ${Domain}, ${Domain}ListParams, ${Domain}FormValues, ${Domain}Status } from "./types";
-export { ${Domain.toUpperCase()}_STATUSES, ${Domain.toUpperCase()}_STATUS_LABELS, ${Domain.toUpperCase()}_STATUS_COLORS } from "./types";
-`;
-}
-
-// ── Component template generators ─────────────────────────────────────────────
-function generateListComponent(Domain, domain, domainKebab) {
   return `"use client";
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { use${Domain}s } from "@/lib/${domainKebab}";
-import { use${Domain}Store } from "@/lib/${domainKebab}";
-import { DataTable, type Column } from "@/components/shared";
+import {
+  ${n.CONST}_PAGE_SIZE,
+  ${n.CONST}_STATUS_LABELS,
+  ${n.CONST}_STATUSES,
+  use${n.Plural},
+  type ${n.Singular},
+  type ${n.Singular}Status,
+} from "@/lib/${n.kebab}";
+${permissionImport}import { formatDateTime } from "@/lib/date-utils";
+import { useDisplayTimeZone } from "@/lib/timezone";
+import { DataView, useDataView, type FilterConfig, type SortOption } from "@/components/data-view";
+import type { Column } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useDebounce } from "@/hooks";
-import type { ${Domain}, ${Domain}ListParams } from "@/lib/${domainKebab}";
-import { ${Domain.toUpperCase()}_STATUS_COLORS, ${Domain.toUpperCase()}_STATUS_LABELS } from "@/lib/${domainKebab}";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { ${n.Singular}DetailModal } from "./${toKebabCase(n.Singular)}-detail-modal";
 
-export function ${Domain}List() {
-  const [params, setParams] = useState<${Domain}ListParams>({ skip: 0, limit: 20 });
-  const { searchQuery, setSearchQuery, open${Domain}Form, open${Domain}View } = use${Domain}Store();
-  const debouncedSearch = useDebounce(searchQuery);
+const STATUS_TONES: Record<${n.Singular}Status, StatusTone> = {
+  active: "success",
+  inactive: "neutral",
+};
 
-  const { data, isLoading } = use${Domain}s({ ...params, search: debouncedSearch });
+const FILTERS: FilterConfig[] = [
+  {
+    key: "status",
+    label: "Status",
+    options: ${n.CONST}_STATUSES.map((status) => ({ value: status, label: ${n.CONST}_STATUS_LABELS[status] })),
+  },
+];
 
-  const columns: Column<${Domain}>[] = [
-    {
-      key: "id",
-      header: "ID",
-      cell: (row) => (
-        <button
-          className="font-mono text-xs text-primary hover:underline"
-          onClick={() => open${Domain}View(row)}
-        >
-          {row.id.slice(0, 8)}…
-        </button>
-      ),
-    },
+const SORT_OPTIONS: SortOption[] = [
+  { field: "name", label: "Name" },
+  { field: "created_at", label: "Created" },
+];
+
+function buildColumns(timeZone: string): Column<${n.Singular}>[] {
+  return [
+    { key: "name", header: "Name", sortable: true, mobilePrimary: true },
     {
       key: "status",
       header: "Status",
       cell: (row) => (
-        <Badge className={${Domain.toUpperCase()}_STATUS_COLORS[row.status]}>
-          {${Domain.toUpperCase()}_STATUS_LABELS[row.status]}
-        </Badge>
+        <StatusBadge label={${n.CONST}_STATUS_LABELS[row.status]} tone={STATUS_TONES[row.status]} />
       ),
     },
     {
       key: "createdAt",
       header: "Created",
-      cell: (row) => new Date(row.createdAt).toLocaleDateString(),
+      sortable: true,
+      sortKey: "created_at",
+      cell: (row) => formatDateTime(row.createdAt, { timeZone }),
     },
   ];
+}
 
+// Which panel is open. Only the id is kept: the modal reads the record through
+// \`use${n.Singular}\`, so it is fresh after a save. Server data never goes in a store.
+type Panel = { kind: "closed" } | { kind: "create" } | { kind: "record"; id: string };
+
+export function ${n.Singular}View() {
+  const timeZone = useDisplayTimeZone();
+${canCreate}  const [panel, setPanel] = useState<Panel>({ kind: "closed" });
+  const dv = useDataView({
+    namespace: "${n.kebab}",
+    pageSize: ${n.CONST}_PAGE_SIZE,
+    defaultSort: { field: "created_at", order: "desc" },
+  });
+  const { data, isLoading, isPending, error, refetch } = use${n.Plural}(dv.apiParams);
+  const openCreate = () => setPanel({ kind: "create" });
+
+  // isPending, error and onRetry, all three. Without them a failed list reads as
+  // "there is no data", and a slow one flashes the empty state.
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <Input
-          placeholder="Search ${Domain.toLowerCase()}s…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-xs"
-        />
-        <Button size="sm" onClick={() => open${Domain}Form()}>
-          <Plus className="size-4 mr-1.5" />
-          Add ${Domain}
-        </Button>
-      </div>
-
-      <DataTable
-        columns={columns}
+    <>
+      <DataView
+        params={dv}
+        columns={buildColumns(timeZone)}
         data={data?.items ?? []}
+        total={data?.total ?? 0}
         isLoading={isLoading}
+        isPending={isPending}
+        error={error}
+        onRetry={refetch}
         keyExtractor={(row) => row.id}
-        emptyMessage="No ${Domain.toLowerCase()}s found."
+        onRowClick={(row) => setPanel({ kind: "record", id: row.id })}
+        filters={FILTERS}
+        sortOptions={SORT_OPTIONS}
+        searchPlaceholder="Search ${n.lowerPlural}…"
+        entityName="${n.lowerPlural}"
+        emptyState={${emptyState}}
+        actions={${actions}}
       />
+      <${n.Singular}DetailModal
+        isOpen={panel.kind !== "closed"}
+        recordId={panel.kind === "record" ? panel.id : null}
+        onClose={() => setPanel({ kind: "closed" })}
+      />
+    </>
+  );
+}
 
-      <div className="text-xs text-muted-foreground">
-        {data?.total ?? 0} total
-      </div>
+function AddButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button size="sm" onClick={onClick}>
+      <Plus className="size-4" />
+      Add ${n.lower}
+    </Button>
+  );
+}
+
+function Empty${n.Plural}(${emptyProps}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">No ${n.lowerPlural} yet</p>
+      <p className="text-sm text-muted-foreground">${n.labelPlural} you add will show up here.</p>
+      ${emptyButton}
     </div>
   );
 }
 `;
 }
 
-function generateFormComponent(Domain, domain, domainKebab) {
+function generateFormFile(n) {
+  const idPrefix = toKebabCase(n.Singular);
   return `"use client";
 
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { use${Domain}Store } from "@/lib/${domainKebab}";
-import { useCreate${Domain}, useUpdate${Domain} } from "@/lib/${domainKebab}";
-import { ${domain}FormSchema, type ${Domain}FormValues } from "@/lib/${domainKebab}/types";
+import { Controller, type UseFormReturn } from "react-hook-form";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+  ${n.CONST}_STATUS_LABELS,
+  ${n.CONST}_STATUSES,
+  type ${n.Singular}FormValues,
+} from "@/lib/${n.kebab}";
+import { Field } from "@/components/shared";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function ${Domain}Form() {
-  const { is${Domain}Open, editing${Domain}, isViewMode, close${Domain}Form } = use${Domain}Store();
-  const { mutate: create, isPending: isCreating } = useCreate${Domain}();
-  const { mutate: update, isPending: isUpdating } = useUpdate${Domain}();
+export const ${n.CONST}_FORM_ID = "${idPrefix}-form";
 
-  const isPending = isCreating || isUpdating;
-  const isEdit = Boolean(editing${Domain}) && !isViewMode;
-  const title = isViewMode ? "${Domain} Details" : editing${Domain} ? "Edit ${Domain}" : "New ${Domain}";
+interface ${n.Singular}FormProps {
+  form: UseFormReturn<${n.Singular}FormValues>;
+  onSubmit: React.FormEventHandler<HTMLFormElement>;
+}
 
+/** The fields. The modal owns the form state, the saving and the closing. */
+export function ${n.Singular}Form({ form, onSubmit }: ${n.Singular}FormProps) {
   const {
     register,
-    handleSubmit,
-    reset,
+    control,
     formState: { errors },
-  } = useForm<${Domain}FormValues>({
-    resolver: zodResolver(${domain}FormSchema),
-  });
-
-  useEffect(() => {
-    if (editing${Domain}) {
-      // TODO: reset form with editing${Domain} values
-      reset({});
-    } else {
-      reset({});
-    }
-  }, [editing${Domain}, reset]);
-
-  const onSubmit = (values: ${Domain}FormValues) => {
-    if (editing${Domain} && isEdit) {
-      update(
-        { id: editing${Domain}.id, values },
-        { onSuccess: close${Domain}Form },
-      );
-    } else {
-      create(values, { onSuccess: close${Domain}Form });
-    }
-  };
+  } = form;
 
   return (
-    <Dialog open={is${Domain}Open} onOpenChange={(open) => !open && close${Domain}Form()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
+    <form id={${n.CONST}_FORM_ID} onSubmit={onSubmit} className="space-y-4">
+      <Field label="Name" required error={errors.name?.message}>
+        <Input autoComplete="off" {...register("name")} />
+      </Field>
 
-        {isViewMode && editing${Domain} ? (
-          <div className="space-y-3 text-sm">
-            {/* TODO: Render read-only detail view */}
-            <p className="text-muted-foreground">ID: {editing${Domain}.id}</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {/* TODO: Add form fields */}
-            <div className="space-y-1.5">
-              <Label>Field</Label>
-              <Input placeholder="…" />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={close${Domain}Form}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Saving…" : isEdit ? "Save Changes" : "Create"}
-              </Button>
-            </div>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+      {/* \`htmlFor\` because the Select sits inside a Controller, so Field cannot
+          reach it to wire the label itself. */}
+      <Field label="Status" htmlFor="${idPrefix}-status" error={errors.status?.message}>
+        <Controller
+          control={control}
+          name="status"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="${idPrefix}-status" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {${n.CONST}_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {${n.CONST}_STATUS_LABELS[status]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </Field>
+    </form>
   );
 }
 `;
 }
 
-function generatePageComponent(Domain, domainKebab) {
+function generateDetailModalFile(n, f) {
+  const fileBase = toKebabCase(n.Singular);
+  const permissionImport = f.permissions ? `import { usePermission } from "@/lib/permissions";\n` : "";
+  const canLines = f.permissions
+    ? `  const canEdit = usePermission("${n.resource}.edit");\n  const canDelete = usePermission("${n.resource}.delete");\n`
+    : "";
+  const onModeChange = f.permissions ? "recordId && canEdit ? setMode : undefined" : "recordId ? setMode : undefined";
+  const canDeleteHere = f.permissions ? "recordId && canDelete" : "recordId";
+
   return `"use client";
 
-import { ${Domain}List } from "@/components/${domainKebab}";
-import { ${Domain}Form } from "@/components/${domainKebab}";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  ${n.CONST}_STATUS_LABELS,
+  empty${n.Singular}Form,
+  ${n.singular}FormSchema,
+  ${n.singular}ToForm,
+  use${n.Singular},
+  useCreate${n.Singular},
+  useUpdate${n.Singular},
+  type ${n.Singular},
+  type ${n.Singular}FormValues,
+} from "@/lib/${n.kebab}";
+${permissionImport}import { formatDateTime } from "@/lib/date-utils";
+import { useResetOnOpen } from "@/lib/forms";
+import { useDisplayTimeZone } from "@/lib/timezone";
+import { DetailRow } from "@/components/shared";
+import { Button } from "@/components/ui/button";
+import { Modal, type ModalMode } from "@/components/ui/modal";
+import { Delete${n.Singular}Button } from "./delete-${fileBase}-button";
+import { ${n.CONST}_FORM_ID, ${n.Singular}Form } from "./${fileBase}-form";
 
-export default function ${Domain}Page() {
+interface ${n.Singular}DetailModalProps {
+  isOpen: boolean;
+  /** The record to show, or null to create a new one. */
+  recordId: string | null;
+  onClose: () => void;
+}
+
+/**
+ * Create, view and edit one ${n.lower}, in the shared <Modal>.
+ *
+ * A record opens in view mode, and the pencil switches to edit. A new one opens
+ * straight into the form. The panel stays mounted while closed, so both the mode
+ * and the form are reset every time it opens.
+ */
+export function ${n.Singular}DetailModal({ isOpen, recordId, onClose }: ${n.Singular}DetailModalProps) {
+  const { data: record } = use${n.Singular}(recordId);
+${canLines}  const [mode, setMode] = useState<ModalMode>("edit");
+  useResetOnOpen(isOpen, () => setMode(recordId ? "view" : "edit"));
+
+  const form = useForm<${n.Singular}FormValues>({
+    resolver: zodResolver(${n.singular}FormSchema),
+    defaultValues: empty${n.Singular}Form,
+  });
+  const { reset } = form;
+  // What the form opened with. RHF's isDirty compares against this, so a stray
+  // Escape only asks before throwing away real changes.
+  useEffect(() => {
+    if (isOpen) reset(record ? ${n.singular}ToForm(record) : empty${n.Singular}Form);
+  }, [isOpen, record, reset]);
+
+  const create${n.Singular} = useCreate${n.Singular}();
+  const update${n.Singular} = useUpdate${n.Singular}();
+  const isSaving = create${n.Singular}.isPending || update${n.Singular}.isPending;
+  // The hooks toast success and failure. Here we only close, and only on success.
+  const save = form.handleSubmit((values) => {
+    if (recordId) update${n.Singular}.mutate({ id: recordId, values }, { onSuccess: onClose });
+    else create${n.Singular}.mutate(values, { onSuccess: onClose });
+  });
+
+  const isView = mode === "view";
+  const viewFooter =
+    ${canDeleteHere} ? (
+      <FooterRow>
+        <Delete${n.Singular}Button id={recordId} onDeleted={onClose} />
+      </FooterRow>
+    ) : undefined;
+
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">${Domain}s</h1>
-        <p className="text-muted-foreground">Manage your ${Domain.toLowerCase()}s.</p>
-      </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={recordId ? (record?.name ?? "${n.label}") : "New ${n.lower}"}
+      size="small"
+      mode={recordId ? mode : undefined}
+      onModeChange={${onModeChange}}
+      isDirty={!isView && form.formState.isDirty}
+      footer={
+        isView ? viewFooter : <EditFooter isSaving={isSaving} isNew={!recordId} onCancel={onClose} />
+      }
+    >
+      {isView ? <${n.Singular}Details record={record} /> : <${n.Singular}Form form={form} onSubmit={save} />}
+    </Modal>
+  );
+}
 
-      <${Domain}List />
-      <${Domain}Form />
+function ${n.Singular}Details({ record }: { record: ${n.Singular} | undefined }) {
+  const timeZone = useDisplayTimeZone();
+  if (!record) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  return (
+    <div className="divide-y divide-border">
+      <DetailRow label="Name" value={record.name} />
+      <DetailRow label="Status" value={${n.CONST}_STATUS_LABELS[record.status]} />
+      <DetailRow label="Created" value={formatDateTime(record.createdAt, { timeZone })} />
+      <DetailRow label="Updated" value={formatDateTime(record.updatedAt, { timeZone })} />
     </div>
   );
 }
+
+function FooterRow({ children }: { children: React.ReactNode }) {
+  return <div className="flex justify-end gap-2 p-4">{children}</div>;
+}
+
+interface EditFooterProps {
+  isSaving: boolean;
+  isNew: boolean;
+  onCancel: () => void;
+}
+
+// Save submits the form by id, so Enter in a field and the button do the same thing.
+function EditFooter({ isSaving, isNew, onCancel }: EditFooterProps) {
+  return (
+    <FooterRow>
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" form={${n.CONST}_FORM_ID} disabled={isSaving}>
+        {isSaving ? "Saving…" : isNew ? "Create" : "Save changes"}
+      </Button>
+    </FooterRow>
+  );
+}
 `;
 }
 
-function generateComponentIndexFile(Domain, domainKebab) {
-  return `export { ${Domain}List } from "./${domainKebab}-list";
-export { ${Domain}Form } from "./${domainKebab}-form";
+function generateDeleteButtonFile(n) {
+  return `"use client";
+
+import { Trash2 } from "lucide-react";
+import { useDelete${n.Singular} } from "@/lib/${n.kebab}";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+
+interface Delete${n.Singular}ButtonProps {
+  id: string;
+  onDeleted: () => void;
+}
+
+/** Delete, behind a confirm. A one-click delete is one misclick from lost data. */
+export function Delete${n.Singular}Button({ id, onDeleted }: Delete${n.Singular}ButtonProps) {
+  const delete${n.Singular} = useDelete${n.Singular}();
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" size="sm" disabled={delete${n.Singular}.isPending}>
+          <Trash2 className="size-4" />
+          Delete
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this ${n.lower}?</AlertDialogTitle>
+          <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep it</AlertDialogCancel>
+          <AlertDialogAction onClick={() => delete${n.Singular}.mutate(id, { onSuccess: onDeleted })}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 `;
 }
 
-// ── Commands ───────────────────────────────────────────────────────────────────
-function cmdStartDomain(rawName) {
-  if (!rawName) {
-    err("Usage: node ncube.js startdomain <DomainName>");
+function generateComponentIndexFile(n) {
+  return `export { ${n.Singular}View } from "./${toKebabCase(n.Singular)}-view";
+`;
+}
+
+// ── app/(dashboard)/dashboard/<module>/ ────────────────────────────────────────
+
+function generatePageFile(n) {
+  return `import { ${NAV_ICON} } from "lucide-react";
+import { PageLayout } from "@/components/layout";
+import { ${n.Singular}View } from "@/components/${n.kebab}";
+
+// A Server Component: metadata and layout only. The list is the client view.
+export const metadata = { title: "${n.labelPlural}" };
+
+export default function ${n.Plural}Page() {
+  return (
+    <PageLayout
+      title="${n.labelPlural}"
+      description="Search, filter and open ${n.lowerPlural}."
+      icon={<${NAV_ICON} className="size-4" />}
+    >
+      <${n.Singular}View />
+    </PageLayout>
+  );
+}
+`;
+}
+
+function generateLoadingFile() {
+  return `// The dashboard's skeleton, while this route loads. Replace it with one shaped
+// like this page once the page has settled.
+export { default } from "../loading";
+`;
+}
+
+// ── Registering the module ─────────────────────────────────────────────────────
+//
+// Each registration is an insert between two exact markers, checked before
+// anything is written. If a marker has gone (the file was reshaped by hand), that
+// one registration is skipped and the exact lines to add are printed instead.
+// A half-registered module is worse than a clearly unregistered one.
+
+/** Where to insert `text`: just before the first `end` that follows `start`. */
+function findInsert(source, start, end) {
+  const from = source.indexOf(start);
+  if (from === -1) return -1;
+  return source.indexOf(end, from + start.length);
+}
+
+/** Add `name` to the file's lucide-react import. False if there is no such import. */
+function withLucideIcon(source, name) {
+  const match = /import \{([^}]*)\} from "lucide-react";/.exec(source);
+  if (!match) return null;
+  const names = match[1].split(",").map((s) => s.trim()).filter(Boolean);
+  if (names.includes(name)) return source;
+  const line = `import { ${[...names, name].join(", ")} } from "lucide-react";`;
+  return source.replace(match[0], line);
+}
+
+function registrationPlan(n, f, srcRoot) {
+  const plan = [];
+  const permissionLine = f.permissions ? `    permission: "${n.resource}.view",\n` : "";
+  plan.push({
+    label: "sidebar and ROUTES",
+    file: path.join(srcRoot, "app", "(dashboard)", "config.ts"),
+    already: `"/dashboard/${n.kebab}"`,
+    icon: NAV_ICON,
+    inserts: [
+      {
+        start: "export const dashboardNavItems",
+        end: "];",
+        text: `  {\n    name: "${n.labelPlural}",\n    href: "/dashboard/${n.kebab}",\n    icon: ${NAV_ICON},\n${permissionLine}  },\n`,
+      },
+      {
+        start: "export const ROUTES",
+        end: "} as const;",
+        text: `  ${n.plural}: "/dashboard/${n.kebab}",\n`,
+      },
+    ],
+  });
+  if (!f.permissions) return plan;
+
+  const actions = ["view", "create", "edit", "delete"];
+  plan.push({
+    label: "permission keys",
+    file: path.join(srcRoot, "lib", "permissions", "types.ts"),
+    already: `"${n.resource}.view"`,
+    inserts: [
+      {
+        start: "export const PERMISSIONS = [",
+        end: "] as const;",
+        text: `  // ${n.labelPlural}\n${actions.map((a) => `  "${n.resource}.${a}",\n`).join("")}`,
+      },
+    ],
+  });
+  const backend = { view: ["read", "read_all"], create: ["create"], edit: ["update"], delete: ["delete"] };
+  const mapping = actions
+    .map((a) => `  "${n.resource}.${a}": [${backend[a].map((b) => `"${n.resource}:${b}"`).join(", ")}],\n`)
+    .join("");
+  plan.push({
+    label: "permission mapping",
+    file: path.join(srcRoot, "lib", "permissions", "check.ts"),
+    already: `"${n.resource}.view":`,
+    inserts: [{ start: "PERMISSION_MAPPING: Record<Permission, readonly string[]> = {", end: "};", text: mapping }],
+  });
+  return plan;
+}
+
+/** The new file contents, or a reason it cannot be applied. */
+function applyInserts(item) {
+  if (!fs.existsSync(item.file)) return { error: "file not found" };
+  let source = fs.readFileSync(item.file, "utf8");
+  if (source.includes(item.already)) return { skipped: true };
+  if (item.icon) {
+    source = withLucideIcon(source, item.icon);
+    if (source === null) return { error: 'no `import { … } from "lucide-react"` line' };
+  }
+  for (const insert of item.inserts) {
+    const at = findInsert(source, insert.start, insert.end);
+    if (at === -1) return { error: `could not find \`${insert.start}\` … \`${insert.end}\`` };
+    source = source.slice(0, at) + insert.text + source.slice(at);
+  }
+  return { source };
+}
+
+function registerModule(n, f, srcRoot) {
+  const plan = registrationPlan(n, f, srcRoot);
+  // Check every file first. The permission keys and their mapping must land
+  // together: a key with no mapping entry is a type error in check.ts.
+  const results = plan.map((item) => ({ item, ...applyInserts(item) }));
+  const failed = results.filter((r) => r.error);
+  const permissionsBroken = failed.some((r) => r.item.label.startsWith("permission"));
+
+  for (const r of results) {
+    const rel = path.relative(process.cwd(), r.item.file);
+    const blocked = r.item.label.startsWith("permission") && permissionsBroken;
+    if (r.skipped) info(`${rel} already has the ${r.item.label}`);
+    else if (r.error || blocked) printManualRegistration(r.item, rel, r.error ?? "its pair failed");
+    else {
+      fs.writeFileSync(r.item.file, r.source);
+      ok(`Registered the ${r.item.label} in ${rel}`);
+    }
+  }
+}
+
+function printManualRegistration(item, rel, reason) {
+  warn(`Could not register the ${item.label} in ${rel}: ${reason}.`);
+  dim("Add these lines by hand:");
+  for (const insert of item.inserts) {
+    dim(`  inside ${insert.start} … ${insert.end}`);
+    insert.text.trimEnd().split("\n").forEach((line) => dim(`    ${line}`));
+  }
+  if (item.icon) dim(`  and import ${item.icon} from "lucide-react"`);
+}
+
+// ── The command ────────────────────────────────────────────────────────────────
+
+const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9]*([-_][A-Za-z0-9]+)*$/;
+
+/** `startdomain <Name> [--plural <Plural>]`. Exits if either name is missing or malformed. */
+function parseStartDomainArgs(args) {
+  const pluralFlag = args.indexOf("--plural");
+  const rawPlural = pluralFlag === -1 ? undefined : args[pluralFlag + 1];
+  const rawName = args.find((a, i) => !a.startsWith("--") && (pluralFlag === -1 || i !== pluralFlag + 1));
+  const badPlural = pluralFlag !== -1 && !NAME_PATTERN.test(rawPlural ?? "");
+  if (!rawName || !NAME_PATTERN.test(rawName) || badPlural) {
+    err("Usage: node ncube.js startdomain <Name> [--plural <Plural>]");
+    dim("  The name is singular, like Category or LeadSource. Letters and digits only.");
     process.exit(1);
   }
+  return { rawName, rawPlural };
+}
 
-  const Domain = toPascalCase(rawName);
-  const domain = toCamelCase(rawName);
-  const domainKebab = toKebabCase(rawName);
+/** Everything that must be true before a single file is written. Exits on failure. */
+function checkCanScaffold(n, f, dirs) {
+  if (!f.dataView) {
+    err("startdomain builds its list on DataView, and src/components/data-view is gone.");
+    dim("  docs/rules/07-list-pages.md says every list page uses it. Restore it, or build this list by hand.");
+    process.exit(1);
+  }
+  if (CORE_LIB_DIRS.has(n.kebab)) {
+    err(`"${n.kebab}" is a folder the template already uses in src/lib. Pick another name.`);
+    process.exit(1);
+  }
+  const taken = dirs.filter((d) => fs.existsSync(d));
+  if (taken.length) {
+    err(`${n.Singular} already exists. Nothing was written.`);
+    taken.forEach((d) => dim(`  ${path.relative(process.cwd(), d)}`));
+    process.exit(1);
+  }
+}
 
-  header(`Scaffolding domain: ${Domain}`);
+function writeModuleFiles(n, f, dirs) {
+  const [libDir, compDir, pageDir] = dirs;
+  const base = toKebabCase(n.Singular);
+  const files = [
+    [path.join(libDir, "types.ts"), generateTypesFile(n)],
+    [path.join(libDir, "transformers.ts"), generateTransformersFile(n)],
+    [path.join(libDir, "api.ts"), generateApiFile(n)],
+    [path.join(libDir, "hooks.ts"), generateHooksFile(n, f)],
+    [path.join(libDir, "index.ts"), generateIndexFile(n)],
+    [path.join(compDir, `${base}-view.tsx`), generateViewFile(n, f)],
+    [path.join(compDir, `${base}-form.tsx`), generateFormFile(n)],
+    [path.join(compDir, `${base}-detail-modal.tsx`), generateDetailModalFile(n, f)],
+    [path.join(compDir, `delete-${base}-button.tsx`), generateDeleteButtonFile(n)],
+    [path.join(compDir, "index.ts"), generateComponentIndexFile(n)],
+    [path.join(pageDir, "page.tsx"), generatePageFile(n)],
+    [path.join(pageDir, "loading.tsx"), generateLoadingFile()],
+  ];
+  for (const [file, content] of files) writeFile(file, content);
+}
 
-  // Detect src/ vs root layout
-  const hasSrc = fs.existsSync(path.join(process.cwd(), "src"));
-  const srcRoot = hasSrc ? path.join(process.cwd(), "src") : process.cwd();
+function cmdStartDomain(args) {
+  const { rawName, rawPlural } = parseStartDomainArgs(args);
+  const n = domainNames(rawName, rawPlural);
+  const srcRoot = path.join(process.cwd(), "src");
+  const f = detectFeatures(srcRoot);
+  const dirs = [
+    path.join(srcRoot, "lib", n.kebab),
+    path.join(srcRoot, "components", n.kebab),
+    path.join(srcRoot, "app", "(dashboard)", "dashboard", n.kebab),
+  ];
+  checkCanScaffold(n, f, dirs);
 
-  const libDir = path.join(srcRoot, "lib", domainKebab);
-  const compDir = path.join(srcRoot, "components", domainKebab);
-  const pageDir = path.join(srcRoot, "app", "(dashboard)", "dashboard", domainKebab);
-
-  step(`Creating lib/${domainKebab}/`);
-  writeFile(path.join(libDir, "types.ts"), generateTypesFile(Domain, domain, domainKebab));
-  writeFile(path.join(libDir, "transformers.ts"), generateTransformersFile(Domain, domain));
-  writeFile(path.join(libDir, "api.ts"), generateApiFile(Domain, domain, domainKebab));
-  writeFile(path.join(libDir, "hooks.ts"), generateHooksFile(Domain, domain, domainKebab));
-  writeFile(path.join(libDir, "store.ts"), generateStoreFile(Domain, domain));
-  writeFile(path.join(libDir, "index.ts"), generateIndexFile(Domain, domain));
-
-  step(`Creating components/${domainKebab}/`);
-  writeFile(path.join(compDir, `${domainKebab}-list.tsx`), generateListComponent(Domain, domain, domainKebab));
-  writeFile(path.join(compDir, `${domainKebab}-form.tsx`), generateFormComponent(Domain, domain, domainKebab));
-  writeFile(path.join(compDir, "index.ts"), generateComponentIndexFile(Domain, domainKebab));
-
-  step(`Creating app/(dashboard)/dashboard/${domainKebab}/`);
-  writeFile(path.join(pageDir, "page.tsx"), generatePageComponent(Domain, domainKebab));
-
+  header(`Scaffolding ${n.labelPlural} (/dashboard/${n.kebab})`);
+  if (!f.permissions) info("Permissions were removed, so nothing is gated.");
+  if (!f.blocking) info("The blocking overlay was removed, so mutations use plain useMutation.");
+  writeModuleFiles(n, f, dirs);
   console.log("");
+  registerModule(n, f, srcRoot);
+  printStartDomainNextSteps(n, f, Boolean(rawPlural));
+}
+
+function printStartDomainNextSteps(n, f, pluralGiven) {
   header("Next steps");
-  dim(`1. Add your fields to src/lib/${domainKebab}/types.ts`);
-  dim(`2. Update transformers.ts to map snake_case ↔ camelCase`);
-  dim(`3. Add form fields to src/components/${domainKebab}/${domainKebab}-form.tsx`);
-  dim(`4. Add a nav item in src/app/(dashboard)/config.ts:`);
+  dim(`1. Match src/lib/${n.kebab}/types.ts to your backend. It starts with a name and a status.`);
+  dim(`   Then the transformer, the zod schema, the form fields and the columns.`);
+  dim(`2. Check the API path, /api/v1/${n.kebab}, against your FastAPI router.`);
+  if (f.permissions) {
+    dim(`3. Check the backend names in src/lib/permissions/check.ts, like "${n.resource}:read".`);
+  }
+  dim(`${f.permissions ? 4 : 3}. npm run dev:mock and open /dashboard/${n.kebab}. The list shows an error`);
+  dim(`   with a retry until the backend has the route. That is the error state working.`);
   console.log("");
-  console.log(`  ${c.dim}{${c.reset}`);
-  console.log(`  ${c.dim}  name: "${Domain}s",${c.reset}`);
-  console.log(`  ${c.dim}  href: "/dashboard/${domainKebab}",${c.reset}`);
-  console.log(`  ${c.dim}  icon: SomeIcon,${c.reset}`);
-  console.log(`  ${c.dim}  permission: "${domainKebab}.view",${c.reset}`);
-  console.log(`  ${c.dim}}${c.reset}`);
+  if (pluralGiven) return;
+  dim("Irregular plural? Delete the folders and run again with --plural, like:");
+  dim("  node ncube.js startdomain Person --plural People");
   console.log("");
 }
 
@@ -631,10 +1092,9 @@ function cmdListDomains() {
     return;
   }
 
-  const coreDirs = new Set(["auth", "permissions", "loading", "hooks"]);
   const entries = fs.readdirSync(libDir, { withFileTypes: true });
   const domains = entries
-    .filter((e) => e.isDirectory() && !coreDirs.has(e.name))
+    .filter((e) => e.isDirectory() && !CORE_LIB_DIRS.has(e.name))
     .map((e) => e.name);
 
   if (domains.length === 0) {
@@ -759,130 +1219,11 @@ function cmdInit(rawArgs) {
   console.log("");
   header("You're ready!");
   dim("Next steps:");
-  dim("  1. Edit .env — set NEXT_PUBLIC_API_URL to your backend URL");
-  dim("  2. npm run dev");
+  dim("  1. npm run dev:mock — the app with a fake backend. Sign in with anything.");
+  dim("  2. When the backend is up: set NEXT_PUBLIC_API_URL in .env, then npm run dev");
   console.log("");
   info("Add feature domains with:  node ncube.js startdomain <Name>");
   console.log("");
-}
-
-function cmdCreate(projectName, variant) {
-  // ── Deprecation notice ────────────────────────────────────────────────────────
-  console.log("");
-  console.log(`${c.yellow}${c.bold}⚠  Deprecation notice${c.reset}`);
-  console.log(
-    `${c.dim}  'create' is no longer the recommended way to start a project.${c.reset}`,
-  );
-  console.log(
-    `${c.dim}  Use GitHub's "Use this template" button instead:${c.reset}`,
-  );
-  console.log(
-    `${c.dim}    1. Click "Use this template" on GitHub → name your repo${c.reset}`,
-  );
-  console.log(
-    `${c.dim}    2. git clone <your-repo> && cd <your-repo>${c.reset}`,
-  );
-  console.log(`${c.dim}    3. npm install && node ncube.js init${c.reset}`);
-  console.log(`${c.dim}  Continuing with local 'create' anyway…${c.reset}`);
-  console.log("");
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  if (!projectName) {
-    err("Usage: node ncube.js create <project-name> [--variant base|rbac|full]");
-    process.exit(1);
-  }
-
-  const validVariants = ["base", "rbac", "full"];
-  const resolvedVariant = validVariants.includes(variant) ? variant : "rbac";
-
-  header(`Creating project: ${projectName} (variant: ${resolvedVariant})`);
-
-  const destDir = path.join(process.cwd(), "..", projectName);
-
-  if (fs.existsSync(destDir)) {
-    err(`Directory already exists: ${destDir}`);
-    process.exit(1);
-  }
-
-  step("Copying template files…");
-
-  // Files to exclude from the copy
-  const excludeAlways = new Set([".git", "node_modules", ".next", "ncube.js"]);
-
-  // Files to exclude per variant
-  const excludeByVariant = {
-    base: new Set([
-      "src/lib/permissions",
-      "src/app/(dashboard)/access-control",
-    ]),
-    rbac: new Set([]),
-    full: new Set([]),
-  };
-
-  const excluded = new Set([
-    ...excludeAlways,
-    ...(excludeByVariant[resolvedVariant] || []),
-  ]);
-
-  function copyDir(src, dest) {
-    mkdirp(dest);
-    const entries = fs.readdirSync(src, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const srcPath = path.join(src, entry.name);
-      const destPath = path.join(dest, entry.name);
-      const relPath = path.relative(process.cwd(), srcPath).replace(/\\/g, "/");
-
-      if (excludeAlways.has(entry.name)) continue;
-      if ([...excluded].some((ex) => relPath.startsWith(ex))) continue;
-
-      if (entry.isDirectory()) {
-        copyDir(srcPath, destPath);
-      } else {
-        fs.copyFileSync(srcPath, destPath);
-      }
-    }
-  }
-
-  copyDir(process.cwd(), destDir);
-
-  // Copy ncube.js into the new project
-  fs.copyFileSync(
-    path.join(process.cwd(), "ncube.js"),
-    path.join(destDir, "ncube.js"),
-  );
-
-  // Update package.json name
-  const pkgPath = path.join(destDir, "package.json");
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-    pkg.name = projectName;
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
-  }
-
-  // Create .env from .env.example
-  const envExamplePath = path.join(destDir, ".env.example");
-  const envPath = path.join(destDir, ".env");
-  if (fs.existsSync(envExamplePath) && !fs.existsSync(envPath)) {
-    fs.copyFileSync(envExamplePath, envPath);
-    ok("Created .env from .env.example");
-  }
-
-  console.log("");
-  ok(`Project created at ../${projectName}`);
-  console.log("");
-  header("Next steps");
-  dim(`cd ../${projectName}`);
-  dim("npm install");
-  dim("# Edit .env with your API URL");
-  dim("node ncube.js setup   # installs shadcn/ui components");
-  dim("npm run dev");
-  console.log("");
-
-  if (resolvedVariant === "base") {
-    info("Variant: base — permissions/RBAC system excluded.");
-    dim("To add RBAC later, copy src/lib/permissions from the template.");
-  }
 }
 
 // ── bump command ───────────────────────────────────────────────────────────────
@@ -1132,7 +1473,7 @@ const REMOVABLE = {
       },
     ],
     note:
-      "Every generated mutation hook uses useBlockingMutation. After removing this, `ncube startdomain` output will not compile until you switch those to useMutation.",
+      "Modules you already built on useBlockingMutation stop compiling until you switch them to useMutation. `ncube startdomain` sees the overlay is gone and writes useMutation from now on.",
   },
 
   "data-view": {
@@ -1236,6 +1577,43 @@ function removeDep(pkg, name) {
   return found;
 }
 
+// Not searched for markdown: dependencies, build output, git, and agent
+// worktrees (whole copies of the repo whose links would be edited twice).
+const DOC_SKIP_DIRS = new Set([
+  "node_modules", ".next", ".git", ".claude", "test-results", "playwright-report", "coverage",
+]);
+
+function markdownFiles(dir, out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (DOC_SKIP_DIRS.has(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) markdownFiles(full, out);
+    else if (entry.name.endsWith(".md")) out.push(full);
+  }
+  return out;
+}
+
+/**
+ * Turns every markdown link into a deleted doc into plain text, marked as removed.
+ * A dead link fails `npm run check:docs`, and CI runs that. Returns the files changed.
+ */
+function unlinkDeletedDoc(docPath, featureName) {
+  const deleted = path.join(process.cwd(), docPath);
+  const changed = [];
+  for (const file of markdownFiles(process.cwd())) {
+    const text = fs.readFileSync(file, "utf8");
+    const unlink = (link, label, target) => {
+      const pointsAtDeleted = path.resolve(path.dirname(file), target) === deleted;
+      return pointsAtDeleted ? `${label} (removed by \`ncube remove ${featureName}\`)` : link;
+    };
+    const updated = text.replace(/\[([^\]]*)\]\(([^)\s#]+)(?:#[^)\s]*)?\)/g, unlink);
+    if (updated === text) continue;
+    fs.writeFileSync(file, updated);
+    changed.push(path.relative(process.cwd(), file));
+  }
+  return changed;
+}
+
 function cmdRemoveList() {
   header("Removable features");
   console.log(
@@ -1328,6 +1706,7 @@ function cmdRemove(name, flags) {
         fs.writeFileSync(idx, kept);
         ok(`updated  docs/rules/README.md`);
       }
+      unlinkDeletedDoc(doc, name).forEach((f) => ok(`unlinked ${f}`));
     }
   }
 
@@ -1466,7 +1845,7 @@ function cmdRemoveDocs() {
     }
     const touched = [];
     (f.files ?? []).forEach((x) => touched.push([`\`${x}\``, "deleted"]));
-    (f.docs ?? []).forEach((x) => touched.push([`\`${x}\``, "deleted (and its row in the rules index)"]));
+    (f.docs ?? []).forEach((x) => touched.push([`\`${x}\``, "deleted, with its row in the rules index. Links to it become plain text"]));
     [...new Set((f.edits ?? []).map((e) => e.file))].forEach((x) =>
       touched.push([`\`${x}\``, "edited"]),
     );
@@ -1511,17 +1890,17 @@ ${c.bold}${c.blue}NCube CLI${c.reset} — Next.js scaffolding tool
 
 ${c.bold}Commands:${c.reset}
   ${c.cyan}init${c.reset} [name]                           Post-clone setup: name, .env, shadcn
-  ${c.cyan}startdomain${c.reset} <DomainName>              Scaffold a new feature domain
+  ${c.cyan}startdomain${c.reset} <Name> [--plural <Plural>]  Scaffold a module: list, modal, route, permissions
   ${c.cyan}listdomains${c.reset}                           List existing domains
   ${c.cyan}setup${c.reset}                                 Install shadcn/ui components
   ${c.cyan}remove${c.reset} <feature> [--dry-run]           Strip an optional subsystem cleanly
   ${c.cyan}remove${c.reset} --list                          What can be removed, and when to
-  ${c.cyan}create${c.reset} <name> [--variant base|rbac|full]  ${c.dim}(deprecated)${c.reset} Bootstrap locally
   ${c.cyan}bump${c.reset} <patch|minor|major>              Bump version + add changelog entry
 
 ${c.bold}Examples:${c.reset}
   node ncube.js init my-saas
-  node ncube.js startdomain Product
+  node ncube.js startdomain Category
+  node ncube.js startdomain Person --plural People
   node ncube.js listdomains
   node ncube.js setup
   node ncube.js remove --list
@@ -1536,7 +1915,7 @@ ${c.bold}Examples:${c.reset}
       cmdInit(rest);
       break;
     case "startdomain":
-      cmdStartDomain(rest[0]);
+      cmdStartDomain(rest);
       break;
     case "listdomains":
       cmdListDomains();
@@ -1552,13 +1931,6 @@ ${c.bold}Examples:${c.reset}
     case "bump":
       cmdBump(rest[0]);
       break;
-    case "create": {
-      const variantFlag = rest.indexOf("--variant");
-      const variant = variantFlag !== -1 ? rest[variantFlag + 1] : "rbac";
-      const name = rest.filter((_, i) => i !== variantFlag && i !== variantFlag + 1)[0];
-      cmdCreate(name, variant);
-      break;
-    }
     default:
       err(`Unknown command: ${command}`);
       dim("Run: node ncube.js --help");

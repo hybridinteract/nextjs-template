@@ -1,7 +1,7 @@
 # Module Anatomy
 
 > Read this before you create a new folder anywhere under `src/`.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §1.
 
@@ -49,8 +49,9 @@ readable.
 | File | Responsibility |
 |---|---|
 | `<x>-view.tsx` | `"use client"`. The list surface, built on `<DataView>`. Owns interaction state. |
-| `<x>-form.tsx` | The form fields. Presentational — takes values and an onChange. |
+| `<x>-form.tsx` | The form fields. Takes the react-hook-form instance from the modal. The modal owns the form state, the saving and the closing. |
 | `<x>-detail-modal.tsx` | The detail/edit panel, built on `<Modal>`. |
+| `delete-<x>-button.tsx` | The delete action, behind a confirm. |
 | `index.ts` | The public barrel. |
 
 **Domain groups.** When several modules form one business area, nest both layers under a
@@ -59,6 +60,10 @@ full anatomy and its own barrel; consumers import from `@/lib/crm/leads` directl
 **no group-level barrel** — it would pull every sibling into every import. Route folders
 stay flat at `app/(dashboard)/dashboard/<module>/`, so URLs and permission strings do not
 change when you regroup.
+
+**Plural names.** The folders, the route and the API path use the plural (`categories`),
+because the backend's routes are plural. File and type names use the singular
+(`category-view.tsx`, `Category`).
 
 ## 4. Deliberately not done
 
@@ -75,14 +80,20 @@ change when you regroup.
 3. `api.ts` — one function per endpoint, transformer on every response.
 4. `hooks.ts` — key factory, then queries, then mutations.
 5. `index.ts` — export only what components need.
-6. `src/components/<domain>/` — view, form, detail modal, barrel.
+6. `src/components/<domain>/` — view, form, detail modal, delete button, barrel.
 7. `src/app/(dashboard)/dashboard/<domain>/page.tsx` + `loading.tsx`.
 8. Register the route in `app/(dashboard)/config.ts` and the permissions in
    `lib/permissions/`.
 
-`node ncube.js startdomain <Name>` generates all of this.
+`node ncube.js startdomain <Name>` generates all of this, and does step 8 for you.
+`npm run test:generator` proves its output passes type-check and lint.
 
 ## 6. How to re-check this doc
+
+```bash
+# The generator still writes this anatomy, and it passes type-check and lint.
+npm run test:generator
+```
 
 ```bash
 # A component calling the API directly. Expect zero.

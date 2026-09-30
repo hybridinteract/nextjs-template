@@ -18,7 +18,7 @@ framer-motion · lucide-react · big.js. Path alias `@/*` → `src/*`.
 npm run type-check && npm run lint && npm test && npm run build
 ```
 
-And before opening a PR, the browser suite: `npm run test:e2e`.
+And before opening a PR, the browser suite: `npm run test:e2e`. CI does not run it.
 
 `npm run lint` **is** clean. Keep it that way — this template starts with zero problems, and
 a baseline of "known failures" is how a lint run stops being read. Run it especially when you
@@ -310,7 +310,7 @@ navigation, jsdom cannot see it and it belongs in Playwright.**
 - In Playwright, query only visible elements — `DataTable` renders both layouts and lets CSS
   choose, so a bare `.first()` can resolve to a hidden node. Use `visibleText()` from
   `e2e/fixtures/helpers.ts`.
-- The e2e suite runs with **no backend** (`e2e/fixtures/mock-api.mjs`). Keep it that way.
+- The e2e suite runs with **no backend** (`scripts/mock-api.mjs`). Keep it that way.
 - Don't add a third runner.
 
 ## 17. PWA & offline
@@ -370,4 +370,7 @@ route in `config.ts` and the keys in `lib/permissions/` → tests for anything w
 failure mode → `npm run type-check && npm run lint && npm test && npm run build` all clean,
 and `npm run test:e2e` before the PR.
 
-`node ncube.js startdomain <Name>` scaffolds the whole shape.
+`node ncube.js startdomain <Name>` scaffolds the whole shape, registration included, and
+`npm run test:generator` proves its output passes type-check and lint. Change the generator
+and that test together. `npm run dev:mock` runs the app against a fake backend that accepts
+any login.

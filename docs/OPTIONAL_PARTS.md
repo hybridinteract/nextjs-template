@@ -38,7 +38,7 @@ Role-based gating of nav items and buttons.
 | What | Action |
 |---|---|
 | `src/lib/permissions` | deleted |
-| `docs/rules/06-permissions.md` | deleted (and its row in the rules index) |
+| `docs/rules/06-permissions.md` | deleted, with its row in the rules index. Links to it become plain text |
 | `src/app/(dashboard)/layout.tsx` | edited |
 | `src/app/(dashboard)/config.ts` | edited |
 | `src/app/(dashboard)/config.ts` | lines stripped |
@@ -81,7 +81,7 @@ Ungated dropdown feeds and the shared <ReferencePicker>.
 |---|---|
 | `src/lib/reference` | deleted |
 | `src/components/shared/reference-picker.tsx` | deleted |
-| `docs/rules/13-reference-data.md` | deleted (and its row in the rules index) |
+| `docs/rules/13-reference-data.md` | deleted, with its row in the rules index. Links to it become plain text |
 | `src/components/shared/index.ts` | edited |
 
 ---
@@ -94,7 +94,7 @@ useBlockingMutation and the full-screen overlay it drives.
 
 **What still works:** Mutations still work. You handle pending state per component instead.
 
-> ⚠️ Every generated mutation hook uses useBlockingMutation. After removing this, `ncube startdomain` output will not compile until you switch those to useMutation.
+> ⚠️ Modules you already built on useBlockingMutation stop compiling until you switch them to useMutation. `ncube startdomain` sees the overlay is gone and writes useMutation from now on.
 
 | What | Action |
 |---|---|
@@ -120,7 +120,7 @@ URL-synced search, filters, sort, pagination, row selection and bulk actions.
 | What | Action |
 |---|---|
 | `src/components/data-view` | deleted |
-| `docs/rules/07-list-pages.md` | deleted (and its row in the rules index) |
+| `docs/rules/07-list-pages.md` | deleted, with its row in the rules index. Links to it become plain text |
 
 ---
 

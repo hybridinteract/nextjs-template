@@ -220,7 +220,7 @@ Permissions gate affordances, not access. The backend is the guard.
 
 `node ncube.js startdomain Order` scaffolds all of this. What it generates, and why:
 
-**1. `src/lib/order/types.ts`** — wire shapes in snake_case, domain shapes in camelCase,
+**1. `src/lib/orders/types.ts`** — wire shapes in snake_case, domain shapes in camelCase,
 enums as `as const` arrays.
 
 **2. `transformers.ts`** — `transformOrder(raw)`, plus its own local `asEnum`. The only place
@@ -233,17 +233,18 @@ the two vocabularies meet.
 
 **5. `index.ts`** — export only what components need.
 
-**6. `components/order/order-view.tsx`** — `"use client"`, a `<DataView>`, permission-gated
+**6. `components/orders/order-view.tsx`** — `"use client"`, a `<DataView>`, permission-gated
 actions.
 
 **7. `order-form.tsx`** — react-hook-form + zod. `order-detail-modal.tsx` — a `<Modal>` with
-`isDirty`.
+`isDirty`. `delete-order-button.tsx` — the delete, behind a confirm.
 
-**8. `app/(dashboard)/dashboard/order/page.tsx`** — a server component: metadata,
+**8. `app/(dashboard)/dashboard/orders/page.tsx`** — a server component: metadata,
 `<PageLayout>`, mount the view. Plus `loading.tsx`.
 
 **9. Register it** — `ROUTES` and `dashboardNavItems` in `config.ts`, the keys in
-`lib/permissions/`.
+`lib/permissions/`. `startdomain` does this too. If a file no longer matches what it
+expects, it prints the lines to add by hand.
 
 **10. Verify** — `npm run type-check && npm run lint && npm test && npm run build`.
 

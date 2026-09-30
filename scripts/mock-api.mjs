@@ -5,6 +5,11 @@
  * works on a machine that happens to have one, which means it stops being run.
  * This serves the handful of endpoints the app touches during the tests.
  *
+ * `npm run dev:mock` also uses it, so the app can be opened before the real
+ * backend exists. Change the auth paths here when the backend's differ, or both
+ * the suite and dev:mock break. It lives in scripts/, not e2e/, so
+ * `ncube remove e2e` leaves dev:mock working.
+ *
  * It is not a mock framework and should not grow into one. If a test needs a
  * response this cannot express, that test probably belongs in the Vitest layer.
  */
