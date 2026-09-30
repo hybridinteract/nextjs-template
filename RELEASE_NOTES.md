@@ -19,6 +19,17 @@ whose output you can keep.
 
 ### Fixed
 
+- **Sign-in works against the backend template again.** The login route posted an OAuth2
+  form to `/api/v1/auth/login`. The backend template moved login to
+  `/api/v1/auth/password/login`, JSON `{ email, password }`, on 8 Jun 2026, so every
+  project started since could not sign in until someone found this. Phoenix and Influen
+  had each fixed it in their own copies. The mock still took the old form, so every test
+  passed. It now answers like the backend, and refuses the wrong path or body.
+- **Signing out now revokes the session on the backend.** The logout route sent no body.
+  The backend needs one, with the refresh token, so it refused, and a copied refresh token
+  kept working for up to 7 days after sign-out. It now sends the token whenever there is
+  one, even after the 2-hour access token has expired. A Playwright test signs out, puts the
+  old token back and checks it is refused. It failed before the fix.
 - **Nothing in the app could switch to dark mode.** The theme defaulted to light, and no
   control changed it, so the dark tokens were reachable only by editing localStorage. The
   command palette now has "Switch to dark mode". See Added.

@@ -203,7 +203,7 @@ nothing to steal.
 POST /api/auth/login   → BFF handler calls the backend, sets access + refresh cookies
 GET  /api/auth/me      → returns the user, silently refreshing if the access token expired
 POST /api/auth/refresh → rotates both cookies
-POST /api/auth/logout  → clears them
+POST /api/auth/logout  → revokes the session on the backend, then clears them
 ```
 
 Those four route handlers are the **only** code that touches cookies. Everything else goes
