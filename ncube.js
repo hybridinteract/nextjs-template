@@ -1441,13 +1441,13 @@ const REMOVABLE = {
     docs: [],
     edits: [
       {
-        file: "src/app/layout.tsx",
+        file: "src/components/providers/app-providers.tsx",
         find: 'import { GlobalLoadingOverlay } from "@/components/loading/global-loading-overlay";\n',
         replace: "",
       },
       {
-        file: "src/app/layout.tsx",
-        find: "            <GlobalLoadingOverlay />\n",
+        file: "src/components/providers/app-providers.tsx",
+        find: "      <GlobalLoadingOverlay />\n",
         replace: "",
       },
       {
@@ -1532,17 +1532,20 @@ const REMOVABLE = {
       {
         file: "src/app/layout.tsx",
         find:
-          "          <ThemeProvider\n" +
-          '            attribute="class"\n' +
-          '            defaultTheme="light"\n' +
-          "            enableSystem\n" +
-          "            disableTransitionOnChange\n" +
-          "          >\n",
+          "        {/* Here, not in a group's layout, because the public site needs it\n" +
+          "            too. Its class has to be on <html> before the first paint, or the\n" +
+          "            page flashes the wrong theme. */}\n" +
+          "        <ThemeProvider\n" +
+          '          attribute="class"\n' +
+          '          defaultTheme="light"\n' +
+          "          enableSystem\n" +
+          "          disableTransitionOnChange\n" +
+          "        >\n",
         replace: "",
       },
       {
         file: "src/app/layout.tsx",
-        find: "          </ThemeProvider>\n",
+        find: "        </ThemeProvider>\n",
         replace: "",
       },
       {
@@ -1556,6 +1559,31 @@ const REMOVABLE = {
         replace: "  return (\n    <Sonner\n",
       },
     ],
+  },
+
+  site: {
+    label: "Public site",
+    summary: "The app/(site) route group: pages anyone can read without signing in, starting with the home page at /.",
+    keeps:
+      "Sign-in and the dashboard are unchanged. \"/\" sends people to the dashboard again, and the dashboard sends anyone not signed in to the login page.",
+    when: "The app is only for people who sign in, like an internal tool or an admin console.",
+    files: ["src/app/(site)", "e2e/site.spec.ts"],
+    deps: [],
+    docs: [],
+    edits: [
+      {
+        file: "next.config.ts",
+        find: "  poweredByHeader: false,\n",
+        replace:
+          "  poweredByHeader: false,\n" +
+          "  // No public site (`ncube remove site`), so \"/\" has nothing to show.\n" +
+          "  async redirects() {\n" +
+          '    return [{ source: "/", destination: "/dashboard", permanent: false }];\n' +
+          "  },\n",
+      },
+    ],
+    note:
+      "docs/rules/08-components-and-routing.md still describes the public site. Trim that part so the doc matches what you have.",
   },
 };
 

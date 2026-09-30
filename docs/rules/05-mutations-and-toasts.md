@@ -33,8 +33,11 @@ which is to say: only for the customer.
 - **Exception — multi-step forms.** One user action that fires several mutations (entity +
   photo + documents) emits **one aggregated** toast in the component, and those
   building-block hooks stay silent on success.
-- Inline validation errors stay inline. `<Toaster>` is mounted once in
-  `src/app/layout.tsx`; do not add another.
+- Inline validation errors stay inline. `<Toaster>` is mounted once, in `<AppProviders>`
+  (`components/providers/app-providers.tsx`); do not add another. The `(auth)` and
+  `(dashboard)` layouts each mount that, so a toast raised just before sign-in or
+  sign-out changes group is lost. Say it on the page you land on. The public site has no
+  toaster at all. See rule 08.
 
 ## 3. How it works here
 
@@ -115,7 +118,7 @@ grep -rln "notify.success" src/components/
 ```
 
 ```bash
-# A second Toaster. Expect exactly one, in app/layout.tsx.
+# A second Toaster. Expect exactly one, in components/providers/app-providers.tsx.
 grep -rn "<Toaster" src/
 ```
 

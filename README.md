@@ -29,8 +29,9 @@ Claude Code reads `CLAUDE.md` by itself. Point any other AI tool at it.
    npm run dev:mock
    ```
 
-   Open [http://localhost:3000](http://localhost:3000) and sign in with any email and
-   password. A small fake backend (`scripts/mock-api.mjs`) says yes to every login. The
+   Open [http://localhost:3000](http://localhost:3000). That is the public home page, a
+   placeholder in `src/app/(site)`. Click "Sign in" and use any email and password. A
+   small fake backend (`scripts/mock-api.mjs`) says yes to every login. The
    real login flow still runs: cookies, the proxy and `/me` all work as they will in
    production.
 
@@ -119,8 +120,8 @@ node ncube.js remove permissions --dry-run   # see what it would touch
 node ncube.js remove permissions             # do it
 ```
 
-Seven parts can go: permissions, decimal money, reference pickers, the blocking overlay,
-DataView, the Playwright suite and dark mode. The command deletes the files, undoes the
+Eight parts can go: permissions, decimal money, reference pickers, the blocking overlay,
+DataView, the Playwright suite, dark mode and the public site. The command deletes the files, undoes the
 imports, drops the dependencies and removes the matching rule doc. Then it runs
 `tsc --noEmit` and tells you whether the project still compiles.
 
@@ -206,11 +207,15 @@ builds a screen.
 ```
 src/
 ├── app/
-│   ├── (auth)/                    # Pages you can see signed out
+│   ├── (site)/                    # The public site: "/" and anything else anyone can read.
+│   │   ├── layout.tsx             # Header and footer. No providers, so it stays light.
+│   │   └── page.tsx               # The home page, a placeholder
+│   ├── (auth)/                    # Sign-in pages
+│   │   ├── layout.tsx             # Mounts AppProviders
 │   │   └── login/page.tsx
 │   ├── (dashboard)/               # Pages behind the login
 │   │   ├── config.ts              # Sidebar items and ROUTES. Plain data, no JSX.
-│   │   ├── layout.tsx             # Loads the user and role, renders the shell
+│   │   ├── layout.tsx             # Mounts AppProviders, loads the user and role, renders the shell
 │   │   └── dashboard/
 │   │       ├── layout.tsx         # export const dynamic = "force-dynamic"
 │   │       ├── error.tsx          # A page can crash without taking the shell
@@ -219,7 +224,7 @@ src/
 │   ├── api/auth/                  # BFF route handlers. The only code that touches cookies.
 │   ├── error.tsx  global-error.tsx  not-found.tsx
 │   ├── globals.css                # Design tokens. Every colour lives here.
-│   └── layout.tsx                 # Root layout and the provider stack
+│   └── layout.tsx                 # Fonts, metadata and the theme. Nothing else.
 │
 ├── components/
 │   ├── data-view/                 # The list system: toolbar, table, paging, bulk actions
@@ -229,7 +234,7 @@ src/
 │   ├── layout/                    # DashboardShell, PageLayout
 │   ├── loading/                   # The blocking overlay
 │   ├── auth/                      # SessionExpiredDialog
-│   └── providers/                 # QueryProvider
+│   └── providers/                 # AppProviders and QueryProvider
 │
 ├── hooks/                         # useMediaQuery, useDebounce, useOlderPages
 │

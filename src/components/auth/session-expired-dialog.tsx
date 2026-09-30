@@ -21,7 +21,7 @@ import { useSessionStore } from "@/lib/auth/session-store";
  * What it does buy the user is a beat to copy anything they had typed before the
  * navigation takes it — which the old hard redirect never gave them.
  *
- * Mounted once, in the root layout, beside the other global surfaces.
+ * Mounted by `<AppProviders>`, beside the toaster and the loading overlay.
  */
 export function SessionExpiredDialog() {
   const isExpired = useSessionStore((s) => s.isExpired);

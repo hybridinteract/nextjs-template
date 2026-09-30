@@ -100,7 +100,7 @@ useBlockingMutation and the full-screen overlay it drives.
 |---|---|
 | `src/lib/loading` | deleted |
 | `src/components/loading` | deleted |
-| `src/app/layout.tsx` | edited |
+| `src/components/providers/app-providers.tsx` | edited |
 | `src/lib/auth/hooks.ts` | edited |
 
 ---
@@ -121,6 +121,7 @@ URL-synced search, filters, sort, pagination, row selection and bulk actions.
 |---|---|
 | `src/components/data-view` | deleted |
 | `docs/rules/07-list-pages.md` | deleted, with its row in the rules index. Links to it become plain text |
+| `eslint.config.mjs` | edited |
 
 ---
 
@@ -157,6 +158,24 @@ next-themes and the theme-aware toast surface.
 | `src/app/layout.tsx` | edited |
 | `src/components/ui/sonner.tsx` | edited |
 | `next-themes` | dependency dropped |
+
+---
+
+## `site` — Public site
+
+The app/(site) route group: pages anyone can read without signing in, starting with the home page at /.
+
+**Remove when:** The app is only for people who sign in, like an internal tool or an admin console.
+
+**What still works:** Sign-in and the dashboard are unchanged. "/" sends people to the dashboard again, and the dashboard sends anyone not signed in to the login page.
+
+> ⚠️ docs/rules/08-components-and-routing.md still describes the public site. Trim that part so the doc matches what you have.
+
+| What | Action |
+|---|---|
+| `src/app/(site)` | deleted |
+| `e2e/site.spec.ts` | deleted |
+| `next.config.ts` | edited |
 
 ---
 

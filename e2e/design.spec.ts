@@ -26,3 +26,12 @@ test("the design page never scrolls sideways", async ({ page }) => {
   );
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("a toast raised on the dashboard shows", async ({ page }) => {
+  // The toaster lives in AppProviders, which each signed-in layout mounts. This
+  // is the check that the dashboard's copy is there.
+  await signIn(page);
+  await page.goto("/dashboard/design");
+  await page.getByRole("button", { name: "Success", exact: true }).click();
+  await expect(page.getByText("Order created")).toBeVisible();
+});

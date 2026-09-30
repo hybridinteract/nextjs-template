@@ -41,12 +41,13 @@ the work was done: `git show 7086b93:docs/TEMPLATE_UPDATE_PLAN.md`.
 ```
 src/
 ├── app/
-│   ├── layout.tsx                  root: fonts, providers, global surfaces
+│   ├── layout.tsx                  root: fonts, metadata, the theme. Nothing else.
 │   ├── error.tsx  global-error.tsx  not-found.tsx
-│   ├── (auth)/login/page.tsx       unauthenticated
+│   ├── (site)/                     the public site, "/". No providers.
+│   ├── (auth)/login/page.tsx       unauthenticated. The layout mounts AppProviders.
 │   ├── (dashboard)/
 │   │   ├── config.ts               nav items + ROUTES. Pure data, no JSX.
-│   │   ├── layout.tsx              seeds auth + role stores, renders the shell
+│   │   ├── layout.tsx              mounts AppProviders, seeds auth + role stores, renders the shell
 │   │   └── dashboard/
 │   │       ├── layout.tsx          export const dynamic = "force-dynamic"
 │   │       ├── error.tsx           a page can crash without taking the shell
@@ -210,6 +211,11 @@ through `proxy.ts`, which injects the header on the way past.
 
 `(dashboard)/layout.tsx` seeds the auth and role stores from `/me`. It is deliberately not a
 global provider — that would fire `/me` on the login page.
+
+Query, toasts, the loading overlay and the session dialog are in `<AppProviders>`, which
+`(auth)` and `(dashboard)` mount. The public site mounts none of it, so a visitor downloads
+none of it. The query client is one per browser tab, so the cache survives sign-in.
+→ [`rules/08`](rules/08-components-and-routing.md)
 
 Permissions gate affordances, not access. The backend is the guard.
 → [`rules/06`](rules/06-permissions.md)

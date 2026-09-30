@@ -20,6 +20,22 @@ test("signing in reaches the dashboard", async ({ page }) => {
   await signIn(page);
 });
 
+test("signing in fetches the user once, so the sidebar has its menu at once", async ({ page }) => {
+  // useLogin fetches /me before it moves to the dashboard, so the sidebar draws
+  // its menu on the first paint. (auth) and (dashboard) each mount their own
+  // AppProviders, so that only works because QueryProvider keeps one client per
+  // tab. With a client per layout, the dashboard starts empty and fetches /me
+  // again. Influen has that bug.
+  let meCalls = 0;
+  page.on("request", (req) => {
+    if (new URL(req.url()).pathname === "/api/auth/me") meCalls += 1;
+  });
+
+  await signIn(page);
+  await page.waitForLoadState("networkidle");
+  expect(meCalls).toBe(1);
+});
+
 test("signing out does not tell you your session ended", async ({ page, isMobile }) => {
   // Regression test for a bug Influen shipped from this template. Logout drops
   // the cookies and clears the query cache while the dashboard is still mounted.
