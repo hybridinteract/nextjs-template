@@ -3,7 +3,7 @@
 Hybrid Interactive's Next.js frontend template. It pairs with the FastAPI backend template
 and mirrors its module structure.
 
-**Conventions (read first):** [`CLAUDE.md`](./CLAUDE.md). The one-page guardrail, plus the anti-patterns list.  
+**Conventions (read first):** [`CLAUDE.md`](./CLAUDE.md). The one-page guardrail.  
 **The rules, one per file:** [`docs/rules/`](./docs/rules/README.md)  
 **How it fits together:** [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md)  
 **All documentation:** [`docs/README.md`](./docs/README.md)
@@ -33,6 +33,9 @@ Claude Code reads `CLAUDE.md` by itself. Point any other AI tool at it.
    password. A small fake backend (`scripts/mock-api.mjs`) says yes to every login. The
    real login flow still runs: cookies, the proxy and `/me` all work as they will in
    production.
+
+   Then open [/dashboard/design](http://localhost:3000/dashboard/design). It shows every
+   shared part the template has, in both themes. Build screens by copying from it.
 
 4. When your FastAPI backend is running, set `NEXT_PUBLIC_API_URL` in `.env`, then:
 
@@ -152,8 +155,13 @@ npm run test:e2e     # Playwright: the shared systems, desktop and mobile
 
 It starts its own fake backend, so nothing else needs to be running.
 
+Lint also holds the design rules: no raw Tailwind palette, no hex, no made-up sizes, and
+no raw `<button>` or `<input>` in feature code. See `docs/rules/10-styling.md`.
+
 **Using Claude Code?** `.claude/settings.json` lints every file Claude edits and hands the
-errors straight back to it. So Claude fixes a rule it broke on the spot, not at the end.
+errors straight back to it. So Claude fixes a rule it broke on the spot, not at the end. The
+`build-ui` skill (`.claude/skills/build-ui/`) sends Claude to the design page before it
+builds a screen.
 
 ---
 
@@ -215,6 +223,7 @@ src/
 │
 ├── components/
 │   ├── data-view/                 # The list system: toolbar, table, paging, bulk actions
+│   ├── design/                    # The design page at /dashboard/design
 │   ├── ui/                        # shadcn primitives, plus Modal, StatusBadge, PageHeader
 │   ├── shared/                    # DataTable, ReferencePicker, Field, DetailRow, lazy
 │   ├── layout/                    # DashboardShell, PageLayout
@@ -304,7 +313,7 @@ Three documents, three jobs:
 
 | Document | What it is for |
 |---|---|
-| [`CLAUDE.md`](./CLAUDE.md) | **The guardrail.** Every convention on one page, plus a numbered anti-patterns list. Claude Code reads it by itself. |
+| [`CLAUDE.md`](./CLAUDE.md) | **The guardrail.** Every convention on one page, and the new-feature checklist. Claude Code reads it by itself. |
 | [`docs/rules/`](./docs/rules/README.md) | **The rules, one per file.** What each rule is, how it works here, what was left out on purpose, and the commands that prove the file still matches the code. |
 | [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md) | **The story.** How the pieces fit together, and one request followed from start to end. |
 

@@ -217,7 +217,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
   dark mode work.
   - ❌ `text-red-500`, `text-green-600`, `bg-gray-100`, `style={{ color: "#AA232B" }}`
   - ✅ `text-destructive`, `text-success`, `bg-muted`, `text-primary`
-  - The codebase is at **zero** raw-palette usages. **Keep it at zero.**
+  - ESLint blocks the raw palette, hex and made-up sizes (`text-[13px]`) in class names,
+    and a raw `<button>`/`<input>`/`<select>`/`<textarea>`/`<table>` outside the folders
+    that build parts. **Fix the lint error, never disable it.**
 - Status pills → `<StatusBadge label tone={…} />` (`neutral`/`success`/`warning`/`danger`/
   `info`/`brand`). Map domain status→tone in a small helper.
 - Compose classes with `cn()` (`@/lib/utils`). Use shadcn primitives — don't restyle native
@@ -227,6 +229,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 - Anything that portals takes its z-index from the ladder in `globals.css`
   (`z-(--z-modal)` / `--z-dialog` / `--z-popper` / `--z-tooltip`), **never a bare `z-50`**.
   A `<Select>` inside a `<Modal>` used to open behind it.
+- **Every shared part is on `/dashboard/design`** (`src/components/design/`). Copy from
+  there. A new part goes on it in the same change. The `build-ui` skill in `.claude/skills/`
+  says the same, for Claude.
 - **Rebrand by editing the token values in `:root` and `.dark`.** Nothing else.
 
 ## 11. TypeScript
@@ -341,36 +346,11 @@ navigation, jsdom cannot see it and it belongs in Playwright.**
 
 ---
 
-## Anti-patterns — do NOT do these
+## Anti-patterns — an index
 
-Each line is a violation of the section in brackets; go there for the fix.
-
-1. Calling `fetch`/`apiClient` from a component. [§1]
-2. snake_case leaking into components, or camelCase in payloads. [§2]
-3. Raw colour classes or inline hex (`text-red-500`, `#AA232B`). [§10]
-4. Hand-rolled list state (`useState` for page/search/filters) on a table page. [§7]
-5. Toasting success in both the hook and the component. [§5]
-6. Plain `useMutation` for a write, or invalidating outside the `mutationFn`. [§5]
-7. A one-off dialog instead of `<Modal>`, or a raw `<input>`/`<button>` instead of the shadcn
-   primitives. [§8]
-8. Importing another domain's internals (`@/lib/x/api`) or a deep component path. [§1]
-9. Hardcoding role names, or treating `usePermission` as a security boundary. [§6]
-10. Populating a picker or a filter from a gated module list hook. [§13]
-11. Float math on a money string, or casting a raw backend enum string without `asEnum`. [§2, §12]
-12. `toLocale*String()` on a date, or `new Date(ymd)` on a `YYYY-MM-DD` business date. [§12]
-13. Rendering a raw quantity wire string (`{item.currentQty}` → `1990.000`). [§12]
-14. `"use client"` on a page, or on a component that needs no interactivity. [§8]
-15. Building a download link by hand instead of using `@/lib/utilities`. [§14]
-16. A modal with typed input and no `isDirty`, or a dirty-check written against empty instead
-    of against the state the form opened with. [§9]
-17. A guarded modal that never clears its form — "Discard" that leaves the values sitting
-    there for the next open. [§9]
-18. A `<DataView>` without `error`, `onRetry` and `isPending`. [§7]
-19. Server data copied into a Zustand store. [§4]
-20. `window.location.href` to recover from a failed request. [§15]
-21. Adding a field to the reference-option shape. [§13]
-22. `any`, or a literal union widened with `| string`. [§11]
-23. A service worker that caches an authenticated response. [§17]
+Each section above states its own don'ts. By topic: data flow §1–§4 · writes and toasts §5 ·
+permissions §6, §13 · lists §7 · components and modals §8–§9 · colour §10 · types §11 · dates
+and money §12 · downloads §14 · failures §15 · tests §16 · offline §17.
 
 ## New-feature checklist
 

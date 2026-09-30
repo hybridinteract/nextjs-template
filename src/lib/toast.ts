@@ -1,3 +1,5 @@
+// The one file allowed to import sonner's toast. Everything else calls notify.
+// eslint-disable-next-line no-restricted-imports
 import { toast as sonner, type ExternalToast } from "sonner";
 import { AppError } from "@/types";
 

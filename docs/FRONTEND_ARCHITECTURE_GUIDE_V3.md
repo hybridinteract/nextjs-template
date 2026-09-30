@@ -271,7 +271,7 @@ out, with the reason.
 
 | I want to… | Read |
 |---|---|
-| check myself before a PR | the anti-patterns list in [`../CLAUDE.md`](../CLAUDE.md) |
+| check myself before a PR | the new-feature checklist at the end of [`../CLAUDE.md`](../CLAUDE.md) |
 | know whether I may do X | the matching file in [`rules/`](rules/README.md) |
 | point an AI tool at the conventions | [`../CLAUDE.md`](../CLAUDE.md) |
 | see what changed and why | [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) |
