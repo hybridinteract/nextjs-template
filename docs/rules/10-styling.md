@@ -124,7 +124,8 @@ to pick in the same colour space as the defaults.
 1. No hex, no palette classes.
 2. Statuses map to a `StatusTone` in one helper.
 3. Use shadcn primitives; add new ones with `npx shadcn@latest add <name>`.
-4. Check the module in dark mode before calling it done.
+4. Check the module in dark mode before calling it done. Ctrl+K (⌘K on a Mac), then
+   "Switch to dark mode". Until 30 Sep 2026 nothing in the app could switch it.
 
 ## 6. How to re-check this doc
 

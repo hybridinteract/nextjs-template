@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import {
   ChevronRight,
   LogOut,
   Menu,
+  Search,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { CommandPalette, usePaletteShortcut, useShortcutLabel } from "./command-palette";
 
 interface DashboardShellProps {
   navItems: PermissionedNavItem[];
@@ -118,6 +120,35 @@ function NavLinks({
   );
 }
 
+/**
+ * The visible way into the palette, for everyone who does not know the
+ * shortcut. A palette only ⌘K can open is one most people never find.
+ */
+function PaletteTrigger({ collapsed, onOpen }: { collapsed: boolean; onOpen: () => void }) {
+  const shortcut = useShortcutLabel();
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Search or jump to a page"
+      title={`Search or jump to a page (${shortcut})`}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-lg border border-sidebar-border px-2.5 py-1.5 text-sm text-sidebar-foreground/60",
+        "transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        collapsed && "justify-center px-0",
+      )}
+    >
+      <Search className="size-4 shrink-0" />
+      {!collapsed && (
+        <>
+          <span className="flex-1 truncate text-left">Search…</span>
+          <kbd className="rounded border border-sidebar-border px-1.5 font-sans text-[11px]">{shortcut}</kbd>
+        </>
+      )}
+    </button>
+  );
+}
+
 export function DashboardShell({
   navItems,
   children,
@@ -128,6 +159,9 @@ export function DashboardShell({
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const { mutate: logout } = useLogout();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const togglePalette = useCallback(() => setPaletteOpen((open) => !open), []);
+  usePaletteShortcut(togglePalette);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -162,6 +196,10 @@ export function DashboardShell({
               <ChevronLeft className="size-4" />
             )}
           </Button>
+        </div>
+
+        <div className="px-2 pt-3">
+          <PaletteTrigger collapsed={collapsed} onOpen={() => setPaletteOpen(true)} />
         </div>
 
         <NavLinks navItems={navItems} pathname={pathname} collapsed={collapsed} />
@@ -235,11 +273,22 @@ export function DashboardShell({
             </SheetContent>
           </Sheet>
           <span className="text-sm font-semibold">{moduleTitle}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto size-8"
+            aria-label="Search or jump to a page"
+            onClick={() => setPaletteOpen(true)}
+          >
+            <Search className="size-4" />
+          </Button>
         </header>
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} navItems={navItems} />
     </div>
   );
 }

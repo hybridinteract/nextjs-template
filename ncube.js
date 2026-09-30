@@ -180,8 +180,8 @@ export interface ${n.Singular}ListResult {
   total: number;
 }
 
-/** DataView's \`apiParams\`: skip, limit, search, sort_by, sort_order and the filters. */
-export type ${n.Singular}ListParams = Record<string, string | number | undefined>;
+/** DataView's \`apiParams\`: skip, limit, search, sort_by, sort_order and the filters. A list is a multi-select. */
+export type ${n.Singular}ListParams = Record<string, string | number | string[] | undefined>;
 
 // ── The form ────────────────────────────────────────────────────────────────
 export const ${n.singular}FormSchema = z.object({
@@ -1417,13 +1417,65 @@ const REMOVABLE = {
     summary: "Ungated dropdown feeds and the shared <ReferencePicker>.",
     keeps: "<SearchableSelect> stays — it is the combobox underneath, and useful on its own.",
     when: "Your backend has no /<resource>/options routes and you are not adding them.",
-    files: ["src/lib/reference", "src/components/shared/reference-picker.tsx"],
+    files: [
+      "src/lib/reference",
+      "src/components/shared/reference-picker.tsx",
+      "src/components/data-view/reference-filter.tsx",
+    ],
     deps: [],
     docs: ["docs/rules/13-reference-data.md"],
     edits: [
       {
         file: "src/components/shared/index.ts",
         find: 'export { ReferencePicker } from "./reference-picker";\n',
+        replace: "",
+      },
+      // The DataView reference filter. Skipped when `data-view` is already gone.
+      {
+        file: "src/components/data-view/types.ts",
+        find:
+          "// Type only, so there is no import cycle at runtime. The reference filter keeps\n" +
+          "// its type in its own file, so `ncube remove reference` takes it out whole.\n" +
+          'import type { ReferenceFilterConfig } from "./reference-filter";\n',
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/types.ts",
+        find: "  | BooleanFilterConfig\n  | ReferenceFilterConfig;",
+        replace: "  | BooleanFilterConfig;",
+      },
+      {
+        file: "src/components/data-view/use-data-view.ts",
+        find: '    case "reference":\n',
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/filter-fields.tsx",
+        find: 'import { ReferenceField } from "./reference-filter";\n',
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/filter-fields.tsx",
+        find:
+          '    case "reference":\n' +
+          "      return <ReferenceField config={config} value={value} values={values} set={set} />;\n",
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/filter-pills.tsx",
+        find: 'import { ReferencePill } from "./reference-filter";\n',
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/filter-pills.tsx",
+        find:
+          "        // Its own component, because it fetches the names of the ids it holds.\n" +
+          '        if (config?.type === "reference") return <ReferencePill key={key} config={config} value={value} onRemove={remove} />;\n',
+        replace: "",
+      },
+      {
+        file: "src/components/data-view/index.ts",
+        find: 'export type { ReferenceFilterConfig } from "./reference-filter";\n',
         replace: "",
       },
     ],
@@ -1516,11 +1568,11 @@ const REMOVABLE = {
 
   "dark-mode": {
     label: "Dark mode",
-    summary: "next-themes and the theme-aware toast surface.",
+    summary: "next-themes, the theme-aware toast surface and the palette's theme switch.",
     keeps:
       "The .dark token block stays in globals.css — harmless, and it means re-adding dark mode later is one provider.",
     when: "The product is light-only by design.",
-    files: [],
+    files: ["src/components/layout/theme-command.tsx"],
     deps: ["next-themes"],
     docs: [],
     edits: [
@@ -1551,6 +1603,19 @@ const REMOVABLE = {
       {
         file: "src/components/ui/sonner.tsx",
         find: 'import { useTheme } from "next-themes"\n',
+        replace: "",
+      },
+      {
+        file: "src/components/layout/command-palette.tsx",
+        find: 'import { ThemeCommand } from "./theme-command";\n',
+        replace: "",
+      },
+      {
+        file: "src/components/layout/command-palette.tsx",
+        find:
+          '        <CommandGroup heading="Actions">\n' +
+          "          <ThemeCommand run={run} />\n" +
+          "        </CommandGroup>\n",
         replace: "",
       },
       {
@@ -1660,6 +1725,22 @@ function cmdRemoveList() {
   console.log("");
 }
 
+/**
+ * True when `file` is gone because another removable part that owns it was
+ * removed. Two parts can touch one file: `reference` edits the DataView files,
+ * and `data-view` deletes them. Removed in that order, the edits apply first.
+ * Removed the other way round, there is nothing left to edit, and that is not
+ * a mismatch worth stopping for. A file that is simply missing still stops it.
+ */
+function goneWithAnotherPart(file, name) {
+  if (fs.existsSync(path.join(process.cwd(), file))) return false;
+  return Object.entries(REMOVABLE).some(
+    ([other, part]) =>
+      other !== name &&
+      (part.files ?? []).some((owned) => file === owned || file.startsWith(`${owned}/`)),
+  );
+}
+
 function cmdRemove(name, flags) {
   if (!name || name === "--list") return cmdRemoveList();
 
@@ -1695,7 +1776,8 @@ function cmdRemove(name, flags) {
   // Half-applied removals are the failure mode worth designing against: the
   // build breaks and it is not obvious which of ten edits landed.
   const problems = [];
-  for (const edit of feature.edits ?? []) {
+  const edits = (feature.edits ?? []).filter((edit) => !goneWithAnotherPart(edit.file, name));
+  for (const edit of edits) {
     const p = path.join(process.cwd(), edit.file);
     if (!fs.existsSync(p)) {
       problems.push(`${edit.file} — file not found`);
@@ -1738,7 +1820,7 @@ function cmdRemove(name, flags) {
     }
   }
 
-  for (const edit of feature.edits ?? []) {
+  for (const edit of edits) {
     if (dry) { info(`would edit    ${edit.file}`); continue; }
     const p = path.join(process.cwd(), edit.file);
     fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(edit.find, edit.replace));

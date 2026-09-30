@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { DataView, useDataView, type FilterConfig, type SortOption } from "@/components/data-view";
@@ -30,7 +31,14 @@ interface Widget {
   qty: string;
   dueDate: string;
   createdAt: string;
+  inStock: boolean;
+  colour: string;
 }
+
+const COLOURS = [
+  "Amber", "Black", "Blue", "Bronze", "Green", "Grey",
+  "Indigo", "Orange", "Pink", "Red", "Silver", "White",
+];
 
 const ROWS: Widget[] = Array.from({ length: 47 }, (_, i) => ({
   id: `w${i + 1}`,
@@ -40,6 +48,8 @@ const ROWS: Widget[] = Array.from({ length: 47 }, (_, i) => ({
   qty: (1990 + i).toFixed(3),
   dueDate: `2026-07-${String((i % 28) + 1).padStart(2, "0")}`,
   createdAt: "2026-07-14T21:00:00.000Z",
+  inStock: i % 4 !== 0,
+  colour: COLOURS[i % COLOURS.length],
 }));
 
 const TONES: Record<Widget["status"], StatusTone> = {
@@ -48,17 +58,80 @@ const TONES: Record<Widget["status"], StatusTone> = {
   archived: "neutral",
 };
 
+const STATUS_FILTER: FilterConfig = {
+  key: "status",
+  label: "Status",
+  type: "multiselect",
+  options: [
+    { value: "active", label: "Active" },
+    { value: "draft", label: "Draft" },
+    { value: "archived", label: "Archived" },
+  ],
+};
+
+const IN_STOCK_FILTER: FilterConfig = {
+  key: "in_stock",
+  label: "In stock",
+  type: "boolean",
+};
+
+// Five filters, so the Filters button opens the panel. `?mode=few` keeps two,
+// so the suite can drive the dropdown too.
 const FILTERS: FilterConfig[] = [
+  STATUS_FILTER,
+  IN_STOCK_FILTER,
   {
-    key: "status",
-    label: "Status",
-    options: [
-      { value: "active", label: "Active" },
-      { value: "draft", label: "Draft" },
-      { value: "archived", label: "Archived" },
-    ],
+    key: "colour",
+    label: "Colour",
+    type: "multiselect",
+    group: "Look",
+    options: COLOURS.map((c) => ({ value: c.toLowerCase(), label: c })),
+  },
+  {
+    key: "price",
+    label: "Price",
+    type: "numberrange",
+    group: "Numbers",
+    minKey: "price_min",
+    maxKey: "price_max",
+    presets: [{ label: "Under ₹1,500", max: 1500 }],
+  },
+  {
+    key: "due",
+    label: "Due",
+    type: "daterange",
+    group: "Numbers",
+    fromKey: "due_from",
+    toKey: "due_to",
   },
 ];
+
+const FEW_FILTERS: FilterConfig[] = [STATUS_FILTER, IN_STOCK_FILTER];
+
+type WidgetParams = Record<string, string | number | string[] | undefined>;
+
+/** A list param the way the backend would read it: one value or a repeated one. */
+function asList(value: WidgetParams[string]): string[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [String(value)];
+}
+
+/** Whether a row passes every filter, the way the backend would decide it. */
+function matches(row: Widget, params: WidgetParams): boolean {
+  const search = String(params.search ?? "").toLowerCase();
+  const statuses = asList(params.status);
+  const colours = asList(params.colour);
+  const price = Number(row.price);
+  if (search && !row.name.toLowerCase().includes(search)) return false;
+  if (statuses.length && !statuses.includes(row.status)) return false;
+  if (colours.length && !colours.includes(row.colour.toLowerCase())) return false;
+  if (params.in_stock !== undefined && String(row.inStock) !== params.in_stock) return false;
+  if (params.price_min !== undefined && price < Number(params.price_min)) return false;
+  if (params.price_max !== undefined && price > Number(params.price_max)) return false;
+  if (params.due_from !== undefined && row.dueDate < String(params.due_from)) return false;
+  if (params.due_to !== undefined && row.dueDate > String(params.due_to)) return false;
+  return true;
+}
 
 const SORTS: SortOption[] = [
   { field: "name", label: "Name" },
@@ -66,7 +139,7 @@ const SORTS: SortOption[] = [
 ];
 
 /** Stands in for a list endpoint: filters, sorts and pages exactly like one. */
-function useWidgets(params: Record<string, string | number | undefined>) {
+function useWidgets(params: WidgetParams) {
   return useQuery({
     queryKey: ["fixture-widgets", params],
     queryFn: async () => {
@@ -75,13 +148,7 @@ function useWidgets(params: Record<string, string | number | undefined>) {
       if (mode === "fail") throw new Error("The widgets service is unavailable.");
       if (mode === "empty") return { items: [] as Widget[], total: 0 };
 
-      const search = String(params.search ?? "").toLowerCase();
-      const status = params.status as string | undefined;
-      let rows = ROWS.filter(
-        (r) =>
-          (!search || r.name.toLowerCase().includes(search)) &&
-          (!status || r.status === status),
-      );
+      let rows = ROWS.filter((r) => matches(r, params));
       const sortBy = params.sort_by as keyof Widget | undefined;
       if (sortBy) {
         const dir = params.sort_order === "asc" ? 1 : -1;
@@ -98,7 +165,8 @@ function useWidgets(params: Record<string, string | number | undefined>) {
 
 export function FixtureView() {
   const tz = useDisplayTimeZone();
-  const dv = useDataView({ namespace: "widgets", defaultSort: { field: "name", order: "asc" } });
+  const filters = useSearchParams().get("mode") === "few" ? FEW_FILTERS : FILTERS;
+  const dv = useDataView({ namespace: "widgets", defaultSort: { field: "name", order: "asc" }, filters });
   const q = useWidgets(dv.apiParams);
   const [detail, setDetail] = useState<Widget | null>(null);
   const [name, setName] = useState("");
@@ -139,7 +207,7 @@ export function FixtureView() {
           setName(r.name);
           setStatus(r.status);
         }}
-        filters={FILTERS}
+        filters={filters}
         sortOptions={SORTS}
         searchPlaceholder="Search widgets…"
         entityName="widgets"

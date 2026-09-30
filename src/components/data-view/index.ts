@@ -10,11 +10,16 @@ export { useRowSelection } from "./use-row-selection";
 export type { UseRowSelectionResult } from "./use-row-selection";
 export { BulkActionBar } from "./bulk-action-bar";
 export type { BulkActionBarProps } from "./bulk-action-bar";
+export { splitMulti, splitRange, joinRange } from "./types";
+export type { ReferenceFilterConfig } from "./reference-filter";
 export type {
   DataViewParams,
   FilterConfig,
   SelectFilterConfig,
+  MultiSelectFilterConfig,
   DateRangeFilterConfig,
+  NumberRangeFilterConfig,
+  BooleanFilterConfig,
   FilterOption,
   SortOption,
   SortState,

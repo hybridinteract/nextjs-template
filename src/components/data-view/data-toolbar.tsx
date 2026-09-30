@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowUpDown, ListFilter, Search, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { ArrowUpDown, ListFilter, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,17 +19,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SearchableSelect } from "@/components/shared/searchable-select";
+import { FilterFields } from "./filter-fields";
+import { FilterPanel } from "./filter-panel";
+import { FilterPills } from "./filter-pills";
 import type { DataViewParams, FilterConfig, SortOption } from "./types";
 
-const ALL = "__all__";
+/**
+ * Past this many filters, the Filters button opens the panel instead of a
+ * dropdown. A dropdown applies each change at once, which is right for a status
+ * and a date. Ten filters do not fit one, and building a query through it costs
+ * a request per change. Both render the same `<FilterFields>`.
+ */
+const PANEL_FROM = 4;
 
 /**
- * Above this many options a filter gets a search box instead of a plain list.
- * Status/type filters are short and read better as a plain list; entity filters
- * (people, employees, approvers) run to hundreds and are unusable without one.
+ * A sort option's identity. Not just its field: "Newest first" and "Oldest
+ * first" can both sort `created_at`, and keying on the field gives React two
+ * children with one key.
  */
-const SEARCHABLE_FROM = 10;
+function sortKeyOf(option: SortOption): string {
+  return option.order ? `${option.field}:${option.order}` : option.field;
+}
+
+/** The option the list is sorted by now, matched on direction as well as field. */
+function activeSortOption(
+  options: SortOption[] | undefined,
+  field: string | null,
+  order: "asc" | "desc",
+): SortOption | undefined {
+  return options?.find(
+    (option) => option.field === field && (option.order === undefined || option.order === order),
+  );
+}
 
 export interface DataToolbarProps {
   params: DataViewParams;
@@ -52,17 +66,6 @@ export interface DataToolbarProps {
   className?: string;
 }
 
-/** Split a `"from|to"` filter value into its two halves. */
-function splitRange(value: string | undefined): [string, string] {
-  const [from = "", to = ""] = (value ?? "").split("|");
-  return [from, to];
-}
-
-/** Join from/to into `"from|to"`, or `""` when both are empty (clears the filter). */
-function joinRange(from: string, to: string): string {
-  return from || to ? `${from}|${to}` : "";
-}
-
 export function DataToolbar({
   params,
   filters,
@@ -74,15 +77,13 @@ export function DataToolbar({
   entityName,
   className,
 }: DataToolbarProps) {
-  const { search, setSearch, filters: active, setFilter, clearFilters, activeFilterCount } = params;
+  const { search, setSearch, filters: active, setFilter, clearFilters } = params;
   const hasFilters = !!filters && filters.length > 0;
   const hasSort = !!sortOptions && sortOptions.length > 0;
-  const activeSortLabel = sortOptions?.find((o) => o.field === params.sortBy)?.label;
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        {/* Search */}
         <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -96,176 +97,124 @@ export function DataToolbar({
         {leading}
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Filters */}
-          {hasFilters && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <ListFilter className="size-4" />
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-64 space-y-3">
-                {filters!.map((f) => {
-                  if (f.type === "daterange") {
-                    const [from, to] = splitRange(active[f.key]);
-                    return (
-                      <div key={f.key} className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            type="date"
-                            value={from}
-                            onChange={(e) => setFilter(f.key, joinRange(e.target.value, to))}
-                            className="flex-1"
-                            aria-label={`${f.label} from`}
-                          />
-                          <span className="text-xs text-muted-foreground">to</span>
-                          <Input
-                            type="date"
-                            value={to}
-                            onChange={(e) => setFilter(f.key, joinRange(from, e.target.value))}
-                            className="flex-1"
-                            aria-label={`${f.label} to`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  }
-                  const allLabel = f.placeholder ?? `All ${f.label.toLowerCase()}`;
-                  return (
-                    <div key={f.key} className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">{f.label}</label>
-                      {f.options.length >= SEARCHABLE_FROM ? (
-                        <SearchableSelect
-                          value={active[f.key] ?? ALL}
-                          onChange={(v) => setFilter(f.key, v === ALL ? "" : v)}
-                          options={[{ value: ALL, label: allLabel }, ...f.options]}
-                          placeholder={allLabel}
-                          searchPlaceholder={`Search ${f.label.toLowerCase()}…`}
-                          emptyText="No matches."
-                          aria-label={f.label}
-                        />
-                      ) : (
-                        <Select
-                          value={active[f.key] ?? ALL}
-                          onValueChange={(v) => setFilter(f.key, v === ALL ? "" : v)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder={allLabel} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={ALL}>{allLabel}</SelectItem>
-                            {f.options.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-                  );
-                })}
-                {activeFilterCount > 0 && (
-                  <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
-                )}
-              </PopoverContent>
-            </Popover>
-          )}
-
-          {/* Sort */}
-          {hasSort && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <ArrowUpDown className="size-4" />
-                  {activeSortLabel ? (
-                    <span>
-                      {activeSortLabel}
-                      <span className="ml-1 text-muted-foreground">
-                        {params.sortOrder === "asc" ? "↑" : "↓"}
-                      </span>
-                    </span>
-                  ) : (
-                    "Sort"
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {sortOptions!.map((o) => {
-                  const isActive = params.sortBy === o.field;
-                  return (
-                    <DropdownMenuItem
-                      key={o.field}
-                      onClick={() => params.setSort(o.field)}
-                      className={cn(isActive && "font-medium")}
-                    >
-                      {o.label}
-                      {isActive && (
-                        <span className="ml-auto text-muted-foreground">
-                          {params.sortOrder === "asc" ? "↑" : "↓"}
-                        </span>
-                      )}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
+          {hasFilters && <FilterControl filters={filters} params={params} entityName={entityName} />}
+          {hasSort && <SortMenu options={sortOptions} params={params} />}
           {actions}
         </div>
       </div>
 
-      {/* Active filter pills */}
-      {hasFilters && activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {Object.entries(active).map(([key, value]) => {
-            const config = filters!.find((f) => f.key === key);
-            let label: string;
-            if (config?.type === "daterange") {
-              const [from, to] = splitRange(value);
-              label = `${from || "…"} → ${to || "…"}`;
-            } else {
-              label = config?.options.find((o) => o.value === value)?.label ?? value;
-            }
-            return (
-              <Badge key={key} variant="secondary" className="gap-1 pr-1 font-normal">
-                <span className="text-muted-foreground">{config?.label ?? key}:</span>
-                {label}
-                <button
-                  type="button"
-                  onClick={() => setFilter(key, "")}
-                  className="ml-0.5 rounded-sm hover:bg-muted-foreground/20"
-                  aria-label={`Remove ${config?.label ?? key} filter`}
-                >
-                  <X className="size-3" />
-                </button>
-              </Badge>
-            );
-          })}
-          <Button variant="ghost" size="xs" onClick={clearFilters} className="text-muted-foreground">
-            Clear all
-          </Button>
-        </div>
+      {hasFilters && (
+        <FilterPills
+          filters={filters}
+          active={active}
+          onRemove={(key) => setFilter(key, "")}
+          onClearAll={clearFilters}
+        />
       )}
 
-      {/* Result count */}
       {totalCount !== undefined && entityName && (
         <p className="text-[13px] sm:text-xs text-muted-foreground">
           <span className="font-semibold text-foreground tabular-nums">{totalCount}</span> {entityName}
         </p>
       )}
     </div>
+  );
+}
+
+/** The Filters button, and the dropdown or panel it opens. */
+function FilterControl({
+  filters,
+  params,
+  entityName,
+}: {
+  filters: FilterConfig[];
+  params: DataViewParams;
+  entityName?: string;
+}) {
+  const [panelOpen, setPanelOpen] = useState(false);
+  const count = params.activeFilterCount;
+
+  const trigger = (onClick?: () => void) => (
+    <Button variant="outline" size="sm" onClick={onClick}>
+      <ListFilter className="size-4" />
+      Filters
+      {count > 0 && (
+        <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">
+          {count}
+        </Badge>
+      )}
+    </Button>
+  );
+
+  if (filters.length > PANEL_FROM) {
+    return (
+      <>
+        {trigger(() => setPanelOpen(true))}
+        <FilterPanel
+          isOpen={panelOpen}
+          onClose={() => setPanelOpen(false)}
+          filters={filters}
+          params={params}
+          entityName={entityName}
+        />
+      </>
+    );
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>{trigger()}</PopoverTrigger>
+      <PopoverContent align="start" className="max-h-[70vh] w-80 overflow-y-auto">
+        <FilterFields filters={filters} values={params.filters} onChange={params.setFilters} columns={1} />
+        {count > 0 && (
+          <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={params.clearFilters}>
+            Clear filters
+          </Button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SortMenu({ options, params }: { options: SortOption[]; params: DataViewParams }) {
+  const current = activeSortOption(options, params.sortBy, params.sortOrder);
+  const arrow = params.sortOrder === "asc" ? "↑" : "↓";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <ArrowUpDown className="size-4" />
+          {current ? (
+            <span>
+              {current.label}
+              {/* A pinned option names its direction already. */}
+              {!current.order && <span className="ml-1 text-muted-foreground">{arrow}</span>}
+            </span>
+          ) : (
+            "Sort"
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {options.map((option) => {
+          const isActive = current !== undefined && sortKeyOf(current) === sortKeyOf(option);
+          return (
+            <DropdownMenuItem
+              key={sortKeyOf(option)}
+              onClick={() => params.setSort(option.field, option.order)}
+              className={cn(isActive && "font-medium")}
+            >
+              {option.label}
+              {isActive && !option.order && (
+                <span className="ml-auto text-muted-foreground">{arrow}</span>
+              )}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

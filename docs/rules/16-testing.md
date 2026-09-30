@@ -81,7 +81,8 @@ remove e2e` deletes it with the suite.
 | `auth.spec.ts` | The redirect carries `?redirect=`, login reaches the dashboard, and **an authenticated call actually reaches the backend through the proxy** — the bug that shipped broken. Signing in fetches `/me` once, which fails if `(auth)` and `(dashboard)` stop sharing one query client. |
 | `design.spec.ts` | Every section of `/dashboard/design` renders, its dialogs open, it never scrolls sideways, and a toast shows on the dashboard. |
 | `site.spec.ts` | `/` is public and links to sign-in, and the public site mounts no toaster. `ncube remove site` deletes it. |
-| `list.spec.ts` | Search/sort write to the URL, a filtered list survives a reload, and the four display states are distinguishable. |
+| `list.spec.ts` | Search/sort write to the URL, a filtered list survives a reload, and the four display states are distinguishable. The filter panel drafts and applies in one write, a multi-select reaches the list as a list, a pill removes one filter, a crossed range says so, and with few filters the dropdown applies at once. |
+| `palette.spec.ts` | Ctrl+K opens the palette and a page can be picked from it, and it switches the theme. |
 | `modal.spec.ts` | The dirty guard, and **that the portal leaves the DOM** after closing. |
 | `responsive.spec.ts` | No horizontal page scroll, table↔cards, panel↔bottom sheet. |
 
