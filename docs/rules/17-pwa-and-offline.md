@@ -1,7 +1,7 @@
 # PWA & Offline
 
 > Read this before you add a service worker.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §17.
 
@@ -93,15 +93,21 @@ grep -rn "serviceWorker" src/ || echo "none"
 ```
 
 ```bash
-# The manifest still meets the installability bar: name, start_url, standalone
-# display, a 192 and a 512 icon, and one maskable.
-node -e "
-const m = require('./src/app/manifest.ts');
-" 2>/dev/null || npx next build >/dev/null 2>&1 && \
-  echo "build the app and fetch /manifest.webmanifest to verify"
-```
-
-```bash
-# Every icon the manifest names actually exists.
-ls -la public/icons/
+# The manifest still meets the installability bar, and every icon it names
+# exists. Expect "installable". Needs Node 22.18 or later, which runs .ts files.
+node --no-warnings --input-type=module -e "
+import { existsSync } from 'node:fs';
+const m = (await import('./src/app/manifest.ts')).default();
+const sizes = m.icons.map((icon) => icon.sizes);
+const missing = [
+  !m.name && 'name',
+  !m.start_url && 'start_url',
+  m.display !== 'standalone' && 'standalone display',
+  !sizes.includes('192x192') && 'a 192 icon',
+  !sizes.includes('512x512') && 'a 512 icon',
+  !m.icons.some((icon) => icon.purpose === 'maskable') && 'a maskable icon',
+  ...m.icons.filter((icon) => !existsSync('public' + icon.src)).map((icon) => icon.src),
+].filter(Boolean);
+console.log(missing.length ? 'MISSING: ' + missing.join(', ') : 'installable');
+"
 ```

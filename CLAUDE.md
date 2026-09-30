@@ -25,10 +25,10 @@ a baseline of "known failures" is how a lint run stops being read. Run it especi
 touch dates or numbers: the `no-restricted-syntax` rules in `eslint.config.mjs` are
 error-level and **only ESLint catches them** (tsc will not).
 
-**Not every section below applies to every project.** Six subsystems are optional and may
+**Not every section below applies to every project.** Eight parts are optional and may
 have been removed with `node ncube.js remove <feature>` — permissions, numeric, reference,
-blocking-loading, data-view, dark-mode. Check whether the folder exists before assuming a
-rule applies. See [`docs/OPTIONAL_PARTS.md`](docs/OPTIONAL_PARTS.md).
+blocking-loading, data-view, e2e, dark-mode, site. Check whether the folder exists before
+assuming a rule applies. See [`docs/OPTIONAL_PARTS.md`](docs/OPTIONAL_PARTS.md).
 
 Narrative overview: [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md).
 Doc index: [`docs/README.md`](docs/README.md).

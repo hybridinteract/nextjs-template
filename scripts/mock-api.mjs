@@ -85,6 +85,9 @@ createServer(async (req, res) => {
     const body = await readJson(req);
     if (typeof body?.refresh_token !== "string") return missingBody(res);
     if (revoked.has(body.refresh_token)) return json(res, 401, { detail: "Refresh token revoked" });
+    // Like the backend: a refresh token works once. It is retired as the new
+    // pair is issued, so two refreshes with the same token fail here too.
+    revoked.add(body.refresh_token);
     return json(res, 200, issueTokens());
   }
   if (path === "/api/v1/auth/me") {

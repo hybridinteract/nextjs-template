@@ -1,7 +1,7 @@
 # Wire Format ↔ Domain Format
 
 > Read this before you add a field that comes from or goes to the backend.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §2.
 
