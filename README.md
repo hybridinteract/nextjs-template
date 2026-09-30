@@ -1,393 +1,312 @@
 # Next.js Frontend Template
 
-A production-ready, opinionated Next.js frontend template by Hybrid Interactive. Mirrors the structure of the FastAPI template on the frontend.
+Hybrid Interactive's Next.js frontend template. It pairs with the FastAPI backend template
+and mirrors its module structure.
 
-**Conventions (read first):** [`CLAUDE.md`](./CLAUDE.md) — the guardrail, plus the anti-patterns list  
+**Conventions (read first):** [`CLAUDE.md`](./CLAUDE.md). The one-page guardrail, plus the anti-patterns list.  
 **The rules, one per file:** [`docs/rules/`](./docs/rules/README.md)  
 **How it fits together:** [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md)  
 **All documentation:** [`docs/README.md`](./docs/README.md)
 
-Working with an AI assistant? Point it at [`CLAUDE.md`](./CLAUDE.md) — Claude Code reads it
-automatically, and any other tool can be told to read it from the repo.
+Claude Code reads `CLAUDE.md` by itself. Point any other AI tool at it.
 
 ---
 
-## Tech Stack
+## Quick start
 
-| Concern | Library | Version |
-|---------|---------|---------|
-| Framework | Next.js (App Router) | 16.x |
-| UI Library | React | 19.x |
-| Component Primitives | **shadcn/ui** | latest |
-| Server State | TanStack Query | 5.x |
-| Client State | Zustand | 5.x |
-| Styling | Tailwind CSS (v4, CSS-native) | 4.x |
-| Forms | React Hook Form + Zod | RHF 7 + Zod 3 |
-| Icons | Lucide React | latest |
-| Toasts | Sonner | 2.x |
-| Dark Mode | next-themes | 0.4.x |
-| Animations | Framer Motion | 12.x |
-| Decimal math | big.js | 7.x |
-| Auth | BFF pattern (httpOnly cookies) | — |
-| RBAC | Built-in permissions system | — |
-| Unit tests | Vitest + Testing Library | 4.x |
-| Browser tests | Playwright | 1.x |
+1. On the [template repo](https://github.com/hybridinteractive/nextjs-template), click
+   **Use this template**, create your repo, and clone it.
+2. Install and name the project:
 
----
+   ```bash
+   npm install
+   node ncube.js init my-app   # sets the name in package.json and creates .env
+   ```
 
-## Quick Start
+3. Open the app before the backend exists:
 
-### 1. Create your repo from the template
+   ```bash
+   npm run dev:mock
+   ```
 
-Click **"Use this template"** on GitHub → **"Create a new repository"** → name your repo → click **"Create repository"**.
+   Open [http://localhost:3000](http://localhost:3000) and sign in with any email and
+   password. A small fake backend (`scripts/mock-api.mjs`) says yes to every login. The
+   real login flow still runs: cookies, the proxy and `/me` all work as they will in
+   production.
 
-> First time? Go to the [template repo](https://github.com/hybridinteractive/nextjs-template) and click the green **"Use this template"** button.
+4. When your FastAPI backend is running, set `NEXT_PUBLIC_API_URL` in `.env`, then:
 
-### 2. Clone and enter the repo
-
-```bash
-git clone https://github.com/<your-org>/<your-repo>.git
-cd <your-repo>
-```
-
-### 3. Install dependencies
-
-```bash
-npm install
-```
-
-### 4. Run the init command
-
-```bash
-node ncube.js init          # or: node ncube.js init my-app-name
-```
-
-This does two things in one step:
-- Sets the project name in `package.json`
-- Creates `.env` from `.env.example` (with your app name pre-filled)
-
-It also installs the shadcn/ui components, but only if `src/components/ui/` is missing.
-They are committed to the template, so on a normal clone that step is skipped.
-
-### 5. Configure your backend URL
-
-```bash
-# Edit .env — at minimum set:
-NEXT_PUBLIC_API_URL="http://localhost:8000"
-```
-
-### 6. Start the development server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000).
+   ```bash
+   npm run dev
+   ```
 
 ---
 
-### Legacy: bootstrap from a local clone
+## Change these for a new project
 
-If you prefer to work from a local copy of the template instead of GitHub's "Use this template":
+The template's defaults are for India. Each one is set in a single place.
 
-```bash
-# From inside the nextjs-template directory:
-node ncube.js create my-app [--variant base|rbac|full]
-cd ../my-app
-npm install
-npm run dev
-```
-
-> `create` is deprecated in favour of the template flow above. It still works but will show a notice.
+| What | Where |
+|---|---|
+| App name | `node ncube.js init <name>` sets it in `package.json` and in `.env` (`NEXT_PUBLIC_APP_NAME`). The page title, the sidebar and the install manifest read it from there. |
+| Time zone and clock | `DEFAULT_TIME_ZONE` in `src/lib/date-utils.ts`. Default `Asia/Kolkata`, with a 12-hour clock. |
+| Number format | `NUMBER_LOCALE` in `src/lib/numeric/decimal.ts`. Default `en-IN`, so ₹12,75,000. |
+| Currency | `DEFAULT_CURRENCY` in `src/lib/numeric/money.ts`. Default `INR`. |
+| Brand colours and radius | The tokens in `:root` and `.dark` in `src/app/globals.css`. Nothing else. [oklch.com](https://oklch.com) converts your brand colours. |
+| Fonts | Geist and Geist Mono, loaded in `src/app/layout.tsx`. |
+| App icons | The four files in `public/icons/`, and the colours in `src/app/manifest.ts`. |
+| Parts you won't use | `node ncube.js remove --list`. See [Trim what you don't need](#trim-what-you-dont-need). |
 
 ---
 
-## Project Structure
+## Build a module
+
+```bash
+node ncube.js startdomain Category
+node ncube.js startdomain Person --plural People   # when the plural isn't just +s
+```
+
+For `Category` it writes:
 
 ```
-src/
-├── app/
-│   ├── (auth)/                    # Unauthenticated pages
-│   │   └── login/page.tsx
-│   ├── (dashboard)/               # Authenticated pages — permission-gated
-│   │   ├── config.ts              # PermissionedNavItem[], ROUTES — pure data, no JSX
-│   │   ├── layout.tsx             # Seeds auth + role stores, renders the shell
-│   │   └── dashboard/
-│   │       ├── layout.tsx         # export const dynamic = "force-dynamic"
-│   │       ├── error.tsx          # A page can crash without taking the shell
-│   │       ├── loading.tsx        # Route skeleton
-│   │       └── <feature>/page.tsx # Server component
-│   ├── api/auth/                  # BFF route handlers — the only code holding cookies
-│   ├── error.tsx  global-error.tsx  not-found.tsx
-│   ├── globals.css                # Design tokens — the single source of truth
-│   └── layout.tsx                 # Root layout + provider stack
-│
-├── components/
-│   ├── data-view/                 # The list system: toolbar, table, paging, bulk actions
-│   ├── ui/                        # shadcn primitives + Modal, StatusBadge, PageHeader
-│   ├── shared/                    # DataTable, ReferencePicker, Field/DetailRow, lazy
-│   ├── layout/                    # DashboardShell, PageLayout
-│   ├── loading/                   # Global blocking overlay
-│   ├── auth/                      # SessionExpiredDialog
-│   └── providers/                 # QueryProvider
-│
-├── hooks/                         # useMediaQuery, useDebounce, useOlderPages
-│
-├── lib/
-│   ├── api-client.ts              # The one HTTP client — stateless, same-origin
-│   ├── auth/                      # BFF auth + session-expiry store
-│   ├── permissions/               # RBAC: strict Permission union, hooks, mapping
-│   ├── loading/                   # useBlockingMutation + the overlay store
-│   ├── numeric/                   # Money & quantities on big.js — decimal strings
-│   ├── date-utils.ts  timezone.ts # Instants vs business dates
-│   ├── forms/                     # isFormDirty, useResetOnOpen
-│   ├── reference/                 # Ungated dropdown feeds
-│   ├── utilities/                 # Downloads, logger
-│   ├── hooks/                     # useTabState, useZustandTabSync
-│   └── <domain>/                  # types → transformers → api → hooks → index
-│
-├── proxy.ts                       # Route protection + the API rewrite to the backend
-└── types/index.ts                 # AppError, NavItem, shared shapes
-
-docs/
-├── README.md                      # Documentation index
-├── rules/                         # One rule per file — the detail behind CLAUDE.md
-├── OPTIONAL_PARTS.md              # What you can delete, and how
-└── FRONTEND_ARCHITECTURE_GUIDE_V3.md
+src/lib/categories/          types, transformers, api, hooks, index
+src/components/categories/   category-view.tsx            the list, on DataView
+                             category-detail-modal.tsx    view, create and edit, with the unsaved-work guard
+                             category-form.tsx            react-hook-form + zod
+                             delete-category-button.tsx   with a confirm
+src/app/(dashboard)/dashboard/categories/   page.tsx, loading.tsx
 ```
+
+It also adds the sidebar item and the route to `src/app/(dashboard)/config.ts`, and four
+permission keys (view, create, edit, delete) to `src/lib/permissions/`.
+
+The output already follows the rules in `CLAUDE.md`. It type-checks and lints clean on the
+first run, and `npm run test:generator` proves that on every CI run. If you removed
+permissions or the blocking overlay, it writes code without them.
+
+The module starts with two fields, a name and a status. Then:
+
+```
+□ 1. Match src/lib/<module>/types.ts to the backend: the Backend* shape, the frontend
+     shape, the zod schema and the payloads
+□ 2. Map the fields in transformers.ts. asEnum on every enum.
+□ 3. Add the form fields in <name>-form.tsx and the columns in <name>-view.tsx
+□ 4. Check the API path in api.ts against the FastAPI router
+□ 5. Check the backend permission names in src/lib/permissions/check.ts
+□ 6. If another module picks this one by id, add it to REFERENCE_RESOURCES
+□ 7. npm run type-check && npm run lint && npm test && npm run build
+```
+
+`npm run dev:mock` shows the new page straight away. Its list shows an error with a retry
+button until the backend has the route. That is the error state working.
+
+The full checklist, with the reason for each step, is at the bottom of
+[`CLAUDE.md`](./CLAUDE.md).
 
 ---
 
 ## Trim what you don't need
 
-The template ships more than most projects use. Dead code is worse than absent code —
-it gets read, maintained and copied into new modules. Take it out early, while it is easy.
+Dead code is worse than no code. It gets read, maintained and copied into new modules.
+Take it out early, while it is easy.
 
 ```bash
 node ncube.js remove --list
-```
-
-Six subsystems can go cleanly: permissions/RBAC, decimal money, reference pickers, the
-blocking overlay, DataView, and dark mode. The command deletes the files, strips the
-imports and barrel exports, drops the dependencies, removes the matching rule doc, and
-then runs `tsc --noEmit` and tells you honestly whether it worked.
-
-```bash
 node ncube.js remove permissions --dry-run   # see what it would touch
 node ncube.js remove permissions             # do it
 ```
 
-Commit first — that is what makes it revertible. Details:
+Seven parts can go: permissions, decimal money, reference pickers, the blocking overlay,
+DataView, the Playwright suite and dark mode. The command deletes the files, undoes the
+imports, drops the dependencies and removes the matching rule doc. Then it runs
+`tsc --noEmit` and tells you whether the project still compiles.
+
+Commit first, so you can undo it. Details are in
 [`docs/OPTIONAL_PARTS.md`](./docs/OPTIONAL_PARTS.md).
 
 ---
 
 ## Checks
 
-Four commands. All four must pass before a change is done — CI runs the same set.
+All four must pass before a change is done:
 
 ```bash
 npm run type-check   # tsc --noEmit
-npm run lint         # eslint . — currently clean; keep it that way
-npm test             # Vitest: pure modules + component logic, ~1s
-npm run build        # catches what type-check alone cannot
+npm run lint         # clean today. Keep it that way.
+npm test             # Vitest: pure modules and component logic, about 1s
+npm run build        # catches what type-check can't
 ```
 
-And the browser suite, before a PR:
+CI runs those four, plus two more:
+
+```bash
+npm run check:docs       # every markdown link resolves, rule stamps are recent
+npm run test:generator   # startdomain's output type-checks and lints
+```
+
+Before a PR, run the browser suite on your machine. CI doesn't run it.
 
 ```bash
 npm run test:e2e     # Playwright: the shared systems, desktop and mobile
 ```
 
-Two layers on purpose. If an assertion depends on a real layout, a real animation or a
-real navigation, jsdom cannot see it — those live in `e2e/`. It starts its own mock
-backend, so it runs with nothing else running.
+It starts its own fake backend, so nothing else needs to be running.
+
+**Using Claude Code?** `.claude/settings.json` lints every file Claude edits and hands the
+errors straight back to it. So Claude fixes a rule it broke on the spot, not at the end.
 
 ---
 
-## NCube CLI — Domain Scaffolding
+## ncube commands
 
-The `ncube.js` CLI mirrors the FastAPI `fcube.py` module generator. It scaffolds complete feature domains following the architecture conventions.
-
-```bash
-# Post-clone setup (name, .env, shadcn) — run once after cloning
-node ncube.js init [my-app-name]
-
-# Scaffold a new domain
-node ncube.js startdomain Product
-node ncube.js startdomain LeadManagement
-node ncube.js startdomain InvoiceItem
-
-# List existing domains
-node ncube.js listdomains
-
-# Install shadcn/ui components (included in init, but can run standalone)
-node ncube.js setup
-
-# (Deprecated) Bootstrap locally from the template directory
-node ncube.js create my-app [--variant base|rbac|full]
-```
-
-### What `startdomain` generates
-
-Running `node ncube.js startdomain Product` creates:
-
-```
-src/lib/product/
-├── types.ts          # Backend* + Frontend types + Zod schemas + status constants
-├── transformers.ts   # snake_case ↔ camelCase conversions
-├── api.ts            # Service functions via apiClient
-├── hooks.ts          # React Query hooks + query key factory
-├── store.ts          # Zustand UI state (modals, filters)
-└── index.ts          # Barrel exports
-
-src/components/product/
-├── product-list.tsx  # DataTable with search + create button
-├── product-form.tsx  # Dialog with create/edit/view modes
-└── index.ts          # Barrel exports
-
-src/app/(dashboard)/dashboard/product/
-└── page.tsx          # Feature page → /dashboard/product
-```
-
-After running, follow the printed checklist to:
-1. Add your backend field types to `types.ts`
-2. Map fields in `transformers.ts`
-3. Add form fields in `product-form.tsx`
-4. Register the route in `(dashboard)/config.ts`
+| Command | What it does |
+|---|---|
+| `node ncube.js init [name]` | Names the project and creates `.env`. Run once after cloning. |
+| `node ncube.js startdomain <Name> [--plural <Plural>]` | Writes a module. See [Build a module](#build-a-module). |
+| `node ncube.js listdomains` | Lists the modules in `src/lib/`. |
+| `node ncube.js remove <part> [--dry-run]` | Takes out an optional part. `--list` shows them. |
+| `node ncube.js setup` | Runs the shadcn/ui installer. `init` runs it only when `src/components/ui/` is missing. The components ship with the template and some carry local fixes, like the z-index ladder, so don't run this to update them. |
+| `node ncube.js bump <patch\|minor\|major>` | Bumps the version and adds a RELEASE_NOTES entry. |
 
 ---
 
-## Adding a New Feature (Manual Checklist)
+## Tech stack
+
+| Concern | Library | Version |
+|---------|---------|---------|
+| Framework | Next.js (App Router) | 16.x |
+| UI library | React | 19.x |
+| Component primitives | shadcn/ui | latest |
+| Server state | TanStack Query | 5.x |
+| Client state | Zustand | 5.x |
+| Styling | Tailwind CSS (v4, CSS-native) | 4.x |
+| Forms | React Hook Form + Zod | RHF 7, Zod 3 |
+| Icons | Lucide React | latest |
+| Toasts | Sonner | 2.x |
+| Dark mode | next-themes | 0.4.x |
+| Animations | Framer Motion | 12.x |
+| Decimal math | big.js | 7.x |
+| Auth | BFF pattern (httpOnly cookies) | built in |
+| Permissions | Role-based, built in | built in |
+| Unit tests | Vitest + Testing Library | 4.x |
+| Browser tests | Playwright | 1.x |
+
+---
+
+## Project structure
 
 ```
-□ 1. node ncube.js startdomain <Name>
-□ 2. Add backend + frontend types to src/lib/<name>/types.ts
-□ 3. Complete transformers in src/lib/<name>/transformers.ts  (asEnum on every enum)
-□ 4. Add form fields in src/components/<name>/<name>-form.tsx  (RHF + zod)
-□ 5. Pass isDirty on the detail modal, and clear it on open
-□ 6. Add PermissionedNavItem + ROUTES to src/app/(dashboard)/config.ts
-□ 7. Add permission keys to PERMISSIONS in src/lib/permissions/types.ts,
-      and map them in PERMISSION_MAPPING in src/lib/permissions/check.ts
-□ 8. If anything else picks this module by id, add it to REFERENCE_RESOURCES
-□ 9. npm run type-check && npm run lint && npm test && npm run build
-```
+src/
+├── app/
+│   ├── (auth)/                    # Pages you can see signed out
+│   │   └── login/page.tsx
+│   ├── (dashboard)/               # Pages behind the login
+│   │   ├── config.ts              # Sidebar items and ROUTES. Plain data, no JSX.
+│   │   ├── layout.tsx             # Loads the user and role, renders the shell
+│   │   └── dashboard/
+│   │       ├── layout.tsx         # export const dynamic = "force-dynamic"
+│   │       ├── error.tsx          # A page can crash without taking the shell
+│   │       ├── loading.tsx        # Route skeleton
+│   │       └── <module>/page.tsx  # Server component
+│   ├── api/auth/                  # BFF route handlers. The only code that touches cookies.
+│   ├── error.tsx  global-error.tsx  not-found.tsx
+│   ├── globals.css                # Design tokens. Every colour lives here.
+│   └── layout.tsx                 # Root layout and the provider stack
+│
+├── components/
+│   ├── data-view/                 # The list system: toolbar, table, paging, bulk actions
+│   ├── ui/                        # shadcn primitives, plus Modal, StatusBadge, PageHeader
+│   ├── shared/                    # DataTable, ReferencePicker, Field, DetailRow, lazy
+│   ├── layout/                    # DashboardShell, PageLayout
+│   ├── loading/                   # The blocking overlay
+│   ├── auth/                      # SessionExpiredDialog
+│   └── providers/                 # QueryProvider
+│
+├── hooks/                         # useMediaQuery, useDebounce, useOlderPages
+│
+├── lib/
+│   ├── api-client.ts              # The one HTTP client. Stateless, same-origin.
+│   ├── auth/                      # BFF auth and the session-expiry store
+│   ├── permissions/               # Roles, the Permission type, hooks, backend mapping
+│   ├── loading/                   # useBlockingMutation and the overlay store
+│   ├── numeric/                   # Money and quantities on big.js, as decimal strings
+│   ├── date-utils.ts  timezone.ts # Instants vs business dates
+│   ├── forms/                     # isFormDirty, useResetOnOpen
+│   ├── reference/                 # Ungated dropdown feeds
+│   ├── utilities/                 # Downloads, logger
+│   ├── hooks/                     # useTabState, useZustandTabSync
+│   └── <module>/                  # types → transformers → api → hooks → index
+│
+├── proxy.ts                       # Route protection and the API rewrite to the backend
+└── types/index.ts                 # AppError, NavItem, shared shapes
 
-The full version, with the reasoning behind each step, is the **New-feature checklist** at
-the bottom of [`CLAUDE.md`](./CLAUDE.md).
+scripts/                           # dev:mock and its fake backend, the doc and generator checks, the Claude lint hook
+docs/
+├── README.md                      # Documentation index
+├── rules/                         # One rule per file. The detail behind CLAUDE.md.
+├── OPTIONAL_PARTS.md              # What you can remove, and how
+└── FRONTEND_ARCHITECTURE_GUIDE_V3.md
+```
 
 ---
 
 ## Authentication
 
-Authentication uses the **BFF (Backend-for-Frontend) pattern**:
+The **BFF (Backend-for-Frontend) pattern**. The Next.js server holds the tokens, not the
+browser.
 
-- Tokens are stored in **httpOnly cookies** — JavaScript never reads them
-- The `/api/auth/*` route handlers proxy auth to the backend and set cookies
-- `src/proxy.ts` injects `Authorization: Bearer <token>` for `/api/v1/*` routes
-- On 401: `apiClient` auto-refreshes and retries once, then redirects to `/login`
+- Tokens sit in **httpOnly cookies**, so JavaScript never reads them.
+- The `/api/auth/*` route handlers pass login to the backend and set the cookies.
+- `src/proxy.ts` adds `Authorization: Bearer <token>` to every `/api/v1/*` call.
+- On a 401, `apiClient` refreshes once and retries. If the refresh fails too, a dialog
+  says the session expired and asks you to sign in again. Nothing redirects on its own,
+  so a half-typed form isn't lost.
 
-| Route | Method | Description |
+| Route | Method | What it does |
 |-------|--------|-------------|
-| `/api/auth/login` | POST | Proxy login, set httpOnly cookies (access: 2hr, refresh: 7d) |
-| `/api/auth/me` | GET | Return current user, silently refresh if expired |
-| `/api/auth/refresh` | POST | Rotate tokens, set new cookies |
-| `/api/auth/logout` | POST | Clear cookies |
+| `/api/auth/login` | POST | Passes login to the backend, sets the cookies (access 2 hours, refresh 7 days) |
+| `/api/auth/me` | GET | Returns the current user, and refreshes quietly if the access token expired |
+| `/api/auth/refresh` | POST | Rotates both tokens |
+| `/api/auth/logout` | POST | Clears the cookies |
 
 ---
 
-## Permission System
-
-Built-in RBAC with 4 default roles. Customize in `src/lib/permissions/config.ts`.
+## Permissions
 
 ```ts
-// Permission format: "resource.action"
-const canManage = usePermission("content.manage");
-const canViewOrManage = useAnyPermission(["content.view", "content.manage"]);
+// Frontend keys are "resource.action". The backend's are "resource:action".
+const canCreate = usePermission("categories.create");
 
-// Gate a nav item
-{ name: "Settings", href: "/dashboard/settings", permission: "settings.view" }
+// Gate a sidebar item in src/app/(dashboard)/config.ts
+{ name: "Categories", href: "/dashboard/categories", icon: LayoutList, permission: "categories.view" }
 ```
 
-**Default roles:** `super_admin` → `admin` → `member` → `viewer`
-
-`super_admin` always passes all permission checks.
+The built-in roles are `super_admin`, `admin`, `member` and `viewer`, in
+`src/lib/permissions/types.ts`. `super_admin` and superusers pass every check.
+`src/lib/permissions/check.ts` maps each frontend key to the backend permissions that grant
+it. Hiding a button is only for the UI. The backend is the real guard.
 
 ---
 
-## Design Tokens
+## Environment variables
 
-All design tokens live in `src/app/globals.css` — the single source of truth for colors, radius, and spacing. Tailwind v4 uses CSS-native configuration (no `tailwind.config.js`).
-
-```css
-/* Customize in globals.css */
-:root {
-  --primary: oklch(0.205 0 0);  /* your brand color */
-  --radius: 0.625rem;
-}
-```
-
-Use semantic tokens in components — **never** hardcode hex colors:
-```tsx
-className="bg-background text-foreground border-border"
-className="text-primary bg-muted text-muted-foreground"
-```
-
----
-
-## Blocking Loading System
-
-All mutations use `useBlockingMutation` instead of raw `useMutation`. This automatically shows a global loading overlay during async operations.
-
-```ts
-// In hooks.ts — use this instead of useMutation
-export function useCreateProduct() {
-  return useBlockingMutation(
-    { mutationFn: productApi.createProduct, onSuccess: () => toast.success("Created") },
-    { source: "mutation", label: "Creating product…" },
-  );
-}
-```
-
----
-
-## Environment Variables
-
-| Variable | Required | Description |
+| Variable | Required | What it is |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_APP_NAME` | No | App display name |
-| `NEXT_PUBLIC_APP_URL` | No | App URL (default: http://localhost:3000) |
-| `NEXT_PUBLIC_API_URL` | **Yes** | Backend API base URL (e.g., http://localhost:8000) |
+| `NEXT_PUBLIC_APP_NAME` | No | The app's display name |
+| `NEXT_PUBLIC_APP_URL` | No | The app's URL (default http://localhost:3000) |
+| `NEXT_PUBLIC_API_URL` | **Yes** | The backend's base URL, like http://localhost:8000. `npm run dev:mock` sets it for you. |
 
 ---
 
-## Customizing Design Tokens
-
-To brand the template for a specific project, update the CSS variables in `src/app/globals.css`:
-
-```css
-:root {
-  --primary: oklch(0.6 0.2 250);   /* your brand primary */
-  --radius: 0.75rem;               /* border radius */
-}
-.dark {
-  --primary: oklch(0.7 0.2 250);
-}
-```
-
-Use [oklch.com](https://oklch.com) to find your brand colors in the oklch color space.
-
----
-
-## Engineering Conventions
+## Engineering conventions
 
 Three documents, three jobs:
 
 | Document | What it is for |
 |---|---|
-| [`CLAUDE.md`](./CLAUDE.md) | **The guardrail.** Every convention in one page, plus a numbered anti-patterns list. Claude Code reads it automatically. |
-| [`docs/rules/`](./docs/rules/README.md) | **The rules, one per file.** What each rule is, how it works here, what was deliberately left undone, and the commands that prove the file still matches the code. |
-| [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md) | **The narrative.** How the pieces fit together, and the life of a request end to end. |
+| [`CLAUDE.md`](./CLAUDE.md) | **The guardrail.** Every convention on one page, plus a numbered anti-patterns list. Claude Code reads it by itself. |
+| [`docs/rules/`](./docs/rules/README.md) | **The rules, one per file.** What each rule is, how it works here, what was left out on purpose, and the commands that prove the file still matches the code. |
+| [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](./docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md) | **The story.** How the pieces fit together, and one request followed from start to end. |
 
-Each rule has exactly one home, in `docs/rules/`. Everything else states it briefly and links
-there — so when a rule changes there is one file to edit.
+Each rule lives in one place, in `docs/rules/`. Everything else says it briefly and links
+there, so a rule change means editing one file.

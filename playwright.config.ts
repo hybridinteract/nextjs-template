@@ -39,7 +39,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `node e2e/fixtures/mock-api.mjs`,
+      command: `node scripts/mock-api.mjs`,
       port: MOCK_API_PORT,
       reuseExistingServer: !process.env.CI,
       env: { MOCK_API_PORT: String(MOCK_API_PORT) },

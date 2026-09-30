@@ -13,8 +13,9 @@ Follow [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 ## [Unreleased]
 
-Fixes that Influen and Herbally IP found after they were built from 0.2.0, and defaults
-that match the projects this template is actually used for.
+Fixes that Influen and Herbally IP found after they were built from 0.2.0, defaults
+that match the projects this template is actually used for, and a module generator
+whose output you can keep.
 
 ### Fixed
 
@@ -41,6 +42,16 @@ that match the projects this template is actually used for.
 - Four links to `docs/TEMPLATE_UPDATE_PLAN.md`, removed in the last release, now point to
   git history. The README's Variants table, which described an admin panel that does not
   exist, is gone. The README checklist named a `permissions/helpers.ts` that does not exist.
+- **`ncube startdomain` writes code that passes lint and follows the rules.** Its output
+  used to fail `npm run lint` on the first run (a `toLocaleDateString()`), and it wrote a
+  Zustand store, a raw `<button>`, a shadcn `Dialog` with no unsaved-work guard and plain
+  `useMutation`. Nothing noticed, because nothing ran it. See Changed for what it writes now.
+- **`ncube remove` no longer leaves dead links.** Removing permissions, reference pickers or
+  DataView deleted the rule doc but left up to four links into it. Those links now become
+  plain text marked as removed.
+- **The README said a failed refresh redirects to `/login`.** It shows the session-expired
+  dialog, and has since 0.2.0. The README also described the old generator's output and
+  the removed `create` command.
 
 ### Changed
 
@@ -49,6 +60,40 @@ that match the projects this template is actually used for.
   as ₹12,75,000. New `DEFAULT_CURRENCY = "INR"` in `@/lib/numeric`. Influen inherited UTC and
   every time on screen read 5.5 hours behind. Both projects switched the locale by hand.
   For a project outside India, change the three constants once.
+- **`ncube startdomain` is rewritten.** It writes a DataView list, a `<Modal>` with `isDirty`
+  and view/edit modes, a react-hook-form + zod form, a delete button with a confirm, a
+  query-key factory, `useBlockingMutation` with invalidation inside the `mutationFn`, and
+  `asEnum` and `formToPayload` in the transformer. It registers the sidebar item, the route
+  and the permission keys itself, and prints the lines to add by hand if a file no longer
+  matches. Folders, route and API path are plural (`categories`), like the backend's routes.
+  `--plural` handles names like Person. If you removed permissions or the blocking overlay,
+  it writes code without them. It stops before writing anything if the module exists.
+- **The mock backend moved from `e2e/fixtures/` to `scripts/mock-api.mjs`**, because
+  `dev:mock` uses it too. Otherwise `ncube remove e2e`, which `remove numeric` and
+  `remove data-view` need first, would have deleted it.
+- **CI no longer runs the Playwright suite.** Run `npm run test:e2e` on your machine before
+  a PR, as Influen and Herbally IP already do. CI now also runs `check:docs` and
+  `test:generator`.
+- `config.ts` lost its Settings, Users and Access Control sidebar items. Those pages do not
+  exist, so the links went to a 404.
+- The README is rewritten: one quick start, a table of what to change for a new project,
+  and no legacy sections.
+
+### Added
+
+- **`npm run dev:mock`** runs the app against a fake backend that accepts any login, so
+  you can open the app before the real backend exists. Ported from Herbally IP.
+- **`npm run test:generator`** runs `startdomain` in throwaway copies of the project, with
+  and without permissions and the blocking overlay, then type-checks and lints the result.
+- **`npm run check:docs`** fails on a dead markdown link or a rule with no "Last verified"
+  stamp, and warns about stamps older than 30 days. Ported from Influen.
+- **A Claude Code hook** (`.claude/settings.json`, `scripts/claude-lint-hook.mjs`) lints
+  every file Claude edits and hands the errors straight back. Ported from Herbally IP.
+
+### Removed
+
+- **`ncube create` and its `--variant` flag.** Deprecated since May 2026. Use GitHub's
+  "Use this template" and `ncube init`.
 
 ---
 

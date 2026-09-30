@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude-lint-hook.mjs\"",
+            "timeout": 60,
+            "statusMessage": "Linting the edited file"
+          }
+        ]
+      }
+    ]
+  }
+}
