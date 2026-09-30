@@ -104,6 +104,18 @@ whose output you can keep.
   template or in any project built from it.
 - **CLAUDE.md's 23-item anti-patterns list is now a short index.** Each item repeated a rule
   in its own section. Influen made the same cut.
+- **`/` is a public home page, not a redirect to `/dashboard`.** See Added.
+  `ncube remove site` puts the redirect back, in `next.config.ts`.
+- **Query, toasts, the loading overlay and the session dialog left the root layout.** They
+  are in `<AppProviders>` (`components/providers/app-providers.tsx`), which the `(auth)` and
+  `(dashboard)` layouts mount. The root layout keeps fonts, metadata and the theme. On a
+  production build the home page loads 181KB of script gzipped, against 214KB with them in
+  the root layout. One catch: a toast raised just before sign-in or sign-out moves you
+  between groups is lost with the old toaster. Say it on the page you land on.
+- **`QueryProvider` keeps one query client per browser tab**, and a new one per request on
+  the server. With a client per mount, the split above threw away the `/me` that sign-in
+  fetches ahead, and the dashboard mounted with no user and fetched it again. Influen split its providers that way and has this bug. A Playwright test
+  counts the `/me` calls. It failed before this change.
 
 ### Added
 
@@ -131,6 +143,12 @@ whose output you can keep.
   page is new.
 - **A `build-ui` skill for Claude Code** (`.claude/skills/build-ui/`) sends Claude to the
   design page and the parts before it builds a screen. Rewritten from Herbally IP's.
+- **A public site, `app/(site)`**, for pages anyone can read without signing in. It has a
+  plain header with a "Sign in" link, a footer and a placeholder home page, and mounts no
+  providers. Influen and Herbally IP both added one. `node ncube.js remove site` takes it
+  out, the eighth removable part.
+- **The sign-in pages are `noindex`**, set once in the `(auth)` layout, so a search for
+  the product never lands on a login form.
 
 ### Removed
 

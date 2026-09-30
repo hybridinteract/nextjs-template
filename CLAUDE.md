@@ -113,7 +113,7 @@ folders stay flat, so URLs and permission strings do not change.
   result is `notify.warning`.
 - **Exception — multi-step forms:** one user action firing several mutations emits **one
   aggregated** toast in the component, and those hooks stay silent on success.
-- `<Toaster>` is mounted once in `src/app/layout.tsx`; don't add another.
+- `<Toaster>` is mounted in `<AppProviders>` (`components/providers/app-providers.tsx`); don't add another.
 
 ## 6. Permissions
 
@@ -177,12 +177,20 @@ owns `dashboardNavItems` (each with `permission`/`permissions` and a `group` lab
 the sidebar section) and the `ROUTES` constants. Import route strings from `ROUTES`; never
 inline `/dashboard/orders`.
 
-**Provider stack** (`app/layout.tsx`, outermost → innermost): `QueryProvider` →
-`ThemeProvider` → `<Toaster>` → `{children}` → `GlobalLoadingOverlay` →
-`SessionExpiredDialog`. **`<Toaster>` stays first**: mounted after the page, it misses
-every toast raised while the page mounts. Only add a provider here if it is **truly global**. Auth state syncs in
-`(dashboard)/layout.tsx`, not a global AuthProvider — that keeps unauthenticated pages from
-firing `/api/auth/me`.
+**Provider stack.** `app/layout.tsx` holds fonts, metadata and `ThemeProvider`, nothing else.
+`(auth)` and `(dashboard)` each mount `<AppProviders>`: `QueryProvider` → `<Toaster>` →
+`{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog`. **`<Toaster>` stays first**:
+mounted after the page, it misses every toast raised while the page mounts. `QueryProvider`
+keeps **one client per browser tab**, so the cache survives the move from sign-in to the
+dashboard. Only add a provider to the root layout if the public site needs it too. Auth
+state syncs in `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps
+unauthenticated pages from firing `/api/auth/me`.
+
+**Public site** (`app/(site)`): pages anyone can read without signing in, starting with `/`.
+It mounts **no providers**, so a visitor downloads no query client and no toaster. A public
+page that needs data or toasts mounts `<AppProviders>` in its own layout. A toast raised
+just before sign-in or sign-out moves you between groups is lost with the old toaster, so
+say it on the page you land on. No public site? `node ncube.js remove site`.
 
 **Blocking loading** (`@/lib/loading`): a Zustand store tracks concurrent blocking actions by
 token; `useBlockingMutation` owns the token lifecycle and `GlobalLoadingOverlay` renders the
