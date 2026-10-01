@@ -38,7 +38,7 @@ Role-based gating of nav items and buttons.
 | What | Action |
 |---|---|
 | `src/lib/permissions` | deleted |
-| `docs/rules/06-permissions.md` | deleted (and its row in the rules index) |
+| `docs/rules/06-permissions.md` | deleted, with its row in the rules index. Links to it become plain text |
 | `src/app/(dashboard)/layout.tsx` | edited |
 | `src/app/(dashboard)/config.ts` | edited |
 | `src/app/(dashboard)/config.ts` | lines stripped |
@@ -81,8 +81,14 @@ Ungated dropdown feeds and the shared <ReferencePicker>.
 |---|---|
 | `src/lib/reference` | deleted |
 | `src/components/shared/reference-picker.tsx` | deleted |
-| `docs/rules/13-reference-data.md` | deleted (and its row in the rules index) |
+| `src/components/data-view/reference-filter.tsx` | deleted |
+| `docs/rules/13-reference-data.md` | deleted, with its row in the rules index. Links to it become plain text |
 | `src/components/shared/index.ts` | edited |
+| `src/components/data-view/types.ts` | edited |
+| `src/components/data-view/use-data-view.ts` | edited |
+| `src/components/data-view/filter-fields.tsx` | edited |
+| `src/components/data-view/filter-pills.tsx` | edited |
+| `src/components/data-view/index.ts` | edited |
 
 ---
 
@@ -94,13 +100,13 @@ useBlockingMutation and the full-screen overlay it drives.
 
 **What still works:** Mutations still work. You handle pending state per component instead.
 
-> ⚠️ Every generated mutation hook uses useBlockingMutation. After removing this, `ncube startdomain` output will not compile until you switch those to useMutation.
+> ⚠️ Modules you already built on useBlockingMutation stop compiling until you switch them to useMutation. `ncube startdomain` sees the overlay is gone and writes useMutation from now on.
 
 | What | Action |
 |---|---|
 | `src/lib/loading` | deleted |
 | `src/components/loading` | deleted |
-| `src/app/layout.tsx` | edited |
+| `src/components/providers/app-providers.tsx` | edited |
 | `src/lib/auth/hooks.ts` | edited |
 
 ---
@@ -120,7 +126,8 @@ URL-synced search, filters, sort, pagination, row selection and bulk actions.
 | What | Action |
 |---|---|
 | `src/components/data-view` | deleted |
-| `docs/rules/07-list-pages.md` | deleted (and its row in the rules index) |
+| `docs/rules/07-list-pages.md` | deleted, with its row in the rules index. Links to it become plain text |
+| `eslint.config.mjs` | edited |
 
 ---
 
@@ -146,7 +153,7 @@ The browser suite, its mock backend, and the fixture route the shared-system tes
 
 ## `dark-mode` — Dark mode
 
-next-themes and the theme-aware toast surface.
+next-themes, the theme-aware toast surface and the palette's theme switch.
 
 **Remove when:** The product is light-only by design.
 
@@ -154,9 +161,29 @@ next-themes and the theme-aware toast surface.
 
 | What | Action |
 |---|---|
+| `src/components/layout/theme-command.tsx` | deleted |
 | `src/app/layout.tsx` | edited |
 | `src/components/ui/sonner.tsx` | edited |
+| `src/components/layout/command-palette.tsx` | edited |
 | `next-themes` | dependency dropped |
+
+---
+
+## `site` — Public site
+
+The app/(site) route group: pages anyone can read without signing in, starting with the home page at /.
+
+**Remove when:** The app is only for people who sign in, like an internal tool or an admin console.
+
+**What still works:** Sign-in and the dashboard are unchanged. "/" sends people to the dashboard again, and the dashboard sends anyone not signed in to the login page.
+
+> ⚠️ docs/rules/08-components-and-routing.md still describes the public site. Trim that part so the doc matches what you have.
+
+| What | Action |
+|---|---|
+| `src/app/(site)` | deleted |
+| `e2e/site.spec.ts` | deleted |
+| `next.config.ts` | edited |
 
 ---
 

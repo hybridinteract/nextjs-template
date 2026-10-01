@@ -112,3 +112,18 @@ test("a closed modal renders nothing", () => {
   );
   expect(screen.queryByText("Edit order")).not.toBeInTheDocument();
 });
+
+test("the panel is a dialog named by its title", () => {
+  // Without the role and the label, a screen reader announces a panel full of
+  // fields with no idea what they belong to. Only the discard prompt had a role.
+  open();
+  expect(screen.getByRole("dialog", { name: "Edit order" })).toBeInTheDocument();
+});
+
+test("a centred modal refuses a full-width size instead of guessing", () => {
+  // "full" in the middle of the screen has no sensible meaning. Failing here
+  // shows the mistake on the laptop it was built on, not on a phone later.
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  expect(() => open({ placement: "center", size: "full" })).toThrow(/cannot be centred/);
+  expect(() => open({ placement: "center", size: "large" })).not.toThrow();
+});

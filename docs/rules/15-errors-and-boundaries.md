@@ -1,7 +1,7 @@
 # Errors, Boundaries & Session Expiry
 
 > Read this before you handle a failure, or wonder what a user sees when something breaks.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §15.
 
@@ -23,8 +23,8 @@ An app with no error boundary answers all three with a white screen.
 
 - Every list surfaces its query error through `<DataView error onRetry>`. See
   [`07-list-pages.md`](07-list-pages.md).
-- Mutation errors go through the module's `handleError` → `toast.error`. See
-  [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md).
+- Mutation errors go through `notify.fromError(err, "Could not …")` in the hook's
+  `onError`. See [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md).
 - Errors from the API are `AppError` with `.statusCode` and `.message`. Narrow with
   `err instanceof AppError`, never with a string match on the message.
 - Do not delete the four boundary files. Each covers a different blast radius.
@@ -67,6 +67,24 @@ offering to stay would be a lie; what it buys is a beat to copy what is on scree
 Repeat notifications are ignored — six queries in flight report the same dead session six
 times, and the first one already told the truth.
 
+**A deliberate sign-out is not an expired session.** `useLogout` drops the cookies and clears
+the query cache while the dashboard is still mounted, so any query that refetches in that gap
+gets a 401. Influen shipped the result: its logout also cleared a saved store, that
+re-rendered the shell, and "Your session has ended" appeared on the login page at someone
+who had just clicked Sign out. The plain template does not re-render there, so it never
+showed here, but the first project that clears anything on logout would hit it.
+
+```
+useLogout onMutate → beginSignOut()      markExpired is ignored from here on
+<LoginForm> mounts → clearExpired()      closes any dialog, keeps the sign-out flag
+useLogin onSuccess → reset()             a new session; real expiries count again
+useLogout onError  → cancelSignOut()     still signed in; real expiries count again
+```
+
+The flag is raised before the request, not in `onSuccess`: the 401s arrive a beat later, so
+a flag set on success is already too late. `<LoginForm>` must not call `reset()`, because the
+login page can mount before the last 401s land. `session-store.test.ts` pins each of these.
+
 ## 4. Deliberately not done
 
 | Not done | Why |
@@ -79,7 +97,7 @@ times, and the first one already told the truth.
 ## 5. New module checklist
 
 1. Thread `error` and `onRetry` from the list hook into `<DataView>`.
-2. One `handleError` per module; every mutation uses it.
+2. Every mutation's `onError` is `notify.fromError`. No per-module error helper.
 3. Narrow with `instanceof AppError`.
 4. `logger.error` for anything worth knowing about, never `console`.
 
@@ -99,12 +117,14 @@ grep -rn "console\.\(log\|error\|warn\)" src/ | grep -v "src/lib/utilities/logge
 # Navigation on failure. Expect zero — the session store handles it.
 # Assignment only, comments stripped: reading `location.href` to build a URL is
 # fine, and session-store.ts quotes the old bad line in its docstring.
-grep -rnE "location\.href\s*=" src/ | grep -vE ":\s*\*|//
+grep -rnE "location\.href\s*=" src/ | grep -vE ":\s*\*|//"
 ```
 
 ```bash
-# Routes missing a loading.tsx beside their page.tsx.
-for p in $(find "src/app/(dashboard)" -name page.tsx); do
+# Routes missing a loading.tsx beside their page.tsx. Expect zero. The design
+# page and the e2e fixture load no data, so the dashboard's own skeleton covers
+# them, and they are left out.
+for p in $(find "src/app/(dashboard)" -name page.tsx | grep -v "/design/\|/e2e-fixtures/"); do
   [ -f "$(dirname "$p")/loading.tsx" ] || echo "no loading.tsx: $p"
 done
 ```

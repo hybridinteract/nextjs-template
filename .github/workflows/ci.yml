@@ -27,6 +27,15 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
+      # Links only fail the run. Old "Last verified" stamps print as warnings.
+      - name: Docs
+        run: npm run check:docs
+
+      # New modules get copied from whatever `ncube startdomain` writes, so its
+      # output has to pass type-check and lint too. About 20 seconds.
+      - name: Generator
+        run: npm run test:generator
+
       # Last of the fast checks, because it is the slowest — but it stays, because
       # type-check alone does not prove the app builds. A bad "use client"
       # boundary, or the shared barrel imported from a server component, only
@@ -34,31 +43,5 @@ jobs:
       - name: Build
         run: npm run build
 
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      # Chromium only. The suite tests this app's behaviour, not browser
-      # differences — adding Firefox and WebKit triples the runtime to re-prove
-      # the same assertions.
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      # playwright.config.ts builds and starts the app itself, with the mock API
-      # beside it, so there is nothing to start here.
-      - name: End-to-end tests
-        run: npm run test:e2e
-
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+# No e2e job, on purpose. The Playwright suite (`npm run test:e2e`) is for
+# checking on your own machine before a PR, not in GitHub.

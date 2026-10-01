@@ -1,7 +1,7 @@
 # Testing
 
 > Read this before you add a test, or decide something does not need one.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §16.
 
@@ -44,8 +44,10 @@ document somebody acted on.
 - **In Playwright, query only visible elements.** `DataTable` renders both layouts into the
   DOM and lets CSS choose; the mobile cards come first, so a bare `.first()` resolves to a
   node that is hidden on desktop. Use `visibleText()` from `e2e/fixtures/helpers.ts`.
-- The e2e suite must run with **no backend**. `e2e/fixtures/mock-api.mjs` stands in for one.
+- The e2e suite must run with **no backend**. `scripts/mock-api.mjs` stands in for one.
   A suite that needs a live API is a suite nobody runs.
+- CI runs `npm test`, not the browser suite. Run `npm run test:e2e` on your machine before a
+  PR.
 - Do not add a third runner.
 
 ## 3. How it works here
@@ -55,9 +57,10 @@ document somebody acted on.
 | `vitest.config.ts` | jsdom, `@/` alias read from tsconfig, `e2e/` excluded. |
 | `vitest.setup.ts` | jest-dom matchers, RTL cleanup, and stubs for `matchMedia` / `scrollIntoView` — jsdom implements neither, and both are read during render. |
 | `playwright.config.ts` | Two projects (desktop, mobile). `webServer` starts the app **and** the mock API. |
-| `e2e/fixtures/mock-api.mjs` | The handful of auth endpoints the suite touches. Not a mock framework — keep it small. |
+| `scripts/mock-api.mjs` | The handful of auth endpoints the suite touches. `npm run dev:mock` uses it too, which is why it lives outside `e2e/`. Not a mock framework — keep it small. |
 | `e2e/fixtures/helpers.ts` | `signIn`, `goToList`, `visibleText`, `portalCount`. |
 | `src/app/(dashboard)/dashboard/e2e-fixtures/` | The list + modal surface the suite drives. |
+| `scripts/test-generator.mjs` | `npm run test:generator`. Runs `ncube startdomain` in throwaway copies of the project, then tsc and ESLint on the result. Not a third runner: it only runs the two checks you already have. CI runs it. |
 
 ### Why there is a fixture route
 
@@ -75,8 +78,11 @@ remove e2e` deletes it with the suite.
 
 | Spec | Proves |
 |---|---|
-| `auth.spec.ts` | The redirect carries `?redirect=`, login reaches the dashboard, and **an authenticated call actually reaches the backend through the proxy** — the bug that shipped broken. |
-| `list.spec.ts` | Search/sort write to the URL, a filtered list survives a reload, and the four display states are distinguishable. |
+| `auth.spec.ts` | The redirect carries `?redirect=`, login reaches the dashboard, and **an authenticated call actually reaches the backend through the proxy** — the bug that shipped broken. Signing in fetches `/me` once, which fails if `(auth)` and `(dashboard)` stop sharing one query client. |
+| `design.spec.ts` | Every section of `/dashboard/design` renders, its dialogs open, it never scrolls sideways, and a toast shows on the dashboard. |
+| `site.spec.ts` | `/` is public and links to sign-in, and the public site mounts no toaster. `ncube remove site` deletes it. |
+| `list.spec.ts` | Search/sort write to the URL, a filtered list survives a reload, and the four display states are distinguishable. The filter panel drafts and applies in one write, a multi-select reaches the list as a list, a pill removes one filter, a crossed range says so, and with few filters the dropdown applies at once. |
+| `palette.spec.ts` | Ctrl+K opens the palette and a page can be picked from it, and it switches the theme. |
 | `modal.spec.ts` | The dirty guard, and **that the portal leaves the DOM** after closing. |
 | `responsive.spec.ts` | No horizontal page scroll, table↔cards, panel↔bottom sheet. |
 
@@ -88,6 +94,7 @@ remove e2e` deletes it with the suite.
 | **Coverage thresholds** | A number that must not go down encourages tests written to raise it. |
 | **Mocking the API in Vitest** | If a test needs a network round trip it is asking a question jsdom cannot answer — that is the signal to write it in Playwright. |
 | **Testing the animation itself** | The e2e tests assert the *outcome* (the portal is gone), not the frames. Asserting on timing makes a suite that fails on a slow CI box. |
+| **The browser suite in CI** | Dropped on 30 Sep 2026, as the projects built from the template had done. It runs on your machine before a PR. The cost: nothing stops a PR that skipped it, so step 5 of §5 matters. |
 | **Visual regression** | Worth having on a product with a design system. On a template it would fail on every legitimate change. |
 
 ## 5. New module checklist
@@ -107,13 +114,13 @@ npm test && npm run test:e2e
 ```
 
 ```bash
-# No third runner has crept in.
-node -e "const d=require('./package.json').devDependencies; console.log(Object.keys(d).filter(k=>/jest|mocha|ava|karma|cypress/.test(k)).join(', ') || 'none')"
+# No third runner has crept in. (@testing-library/jest-dom is matchers for Vitest, not a runner.)
+node -e "const d=require('./package.json').devDependencies; console.log(Object.keys(d).filter(k=>/^(jest|@jest\/|ts-jest|mocha|ava|karma|cypress)/.test(k)).join(', ') || 'none')"
 ```
 
 ```bash
-# Every test names its consequence: each file should carry a leading comment block.
+# Every test names its consequence. A file with no comment at all certainly doesn't.
 for f in $(find src e2e -name "*.test.ts*" -o -name "*.spec.ts"); do
-  head -5 "$f" | grep -q "^//" || echo "no rationale comment: $f"
+  grep -q "^\s*//" "$f" || echo "no rationale comment: $f"
 done; echo done
 ```

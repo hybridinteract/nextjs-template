@@ -1,5 +1,13 @@
 import { test, expect } from "vitest";
-import { formatMoney, quantizeMoney, sumMoney, lineTotal, taxAmount } from "./money";
+import {
+  DEFAULT_CURRENCY,
+  formatMoney,
+  formatMoneyShort,
+  quantizeMoney,
+  sumMoney,
+  lineTotal,
+  taxAmount,
+} from "./money";
 import { formatQuantity, quantizeQuantity, isPositiveQuantity } from "./quantity";
 import { toBig } from "./decimal";
 
@@ -41,13 +49,20 @@ test("quantities render without their storage padding", () => {
 test("money formatting is locale-pinned, not the viewer's", () => {
   // The whole point of NUMBER_LOCALE: an invoice must read the same for everyone.
   expect(formatMoney("1234.5")).toBe("1,234.50");
-  // en-GB writes USD as "US$" to disambiguate it from other dollars. That is the
-  // pinned locale doing its job — the same string for every viewer.
-  expect(formatMoney("1234.5", "USD")).toBe("US$1,234.50");
+  expect(formatMoney("1234.5", DEFAULT_CURRENCY)).toBe("₹1,234.50");
+  expect(formatMoney("1234.5", "USD")).toBe("$1,234.50");
   // Note the NON-BREAKING space: Intl separates a currency code from the number
   // with U+00A0, not a plain space. Anything comparing these strings — a test, a
   // snapshot, a CSV export — has to know that.
   expect(formatMoney("1234.5", "AED")).toBe("AED\u00A01,234.50");
+});
+
+test("big amounts group in lakhs and crores, the way Indian readers read them", () => {
+  // en-GB wrote ₹1,275,000.00. Staff, clients and the backend's own formatter all
+  // write ₹12,75,000.00. Both Influen and Herbally IP changed the locale for this.
+  expect(formatMoney("1275000", DEFAULT_CURRENCY)).toBe("₹12,75,000.00");
+  expect(formatMoney("15262500", DEFAULT_CURRENCY)).toBe("₹1,52,62,500.00");
+  expect(formatQuantity("1234567.5")).toBe("12,34,567.5");
 });
 
 test("garbage in is zero, not NaN", () => {
@@ -65,4 +80,21 @@ test("positive-quantity check works on the string form", () => {
   expect(isPositiveQuantity("0.001")).toBe(true);
   expect(isPositiveQuantity("0.000")).toBe(false);
   expect(isPositiveQuantity("-1")).toBe(false);
+});
+
+test("the short form reads in lakhs and crores, and every rupee under a lakh", () => {
+  // A tile that says ₹8.21L for ₹82.1 lakh is off by ten and still looks right.
+  expect(formatMoneyShort("820542.00")).toBe("₹8.21L");
+  expect(formatMoneyShort("12500000")).toBe("₹1.25Cr");
+  expect(formatMoneyShort("100000")).toBe("₹1.00L");
+  expect(formatMoneyShort("95453.00")).toBe("₹95,453");
+  expect(formatMoneyShort(null)).toBe("₹0");
+});
+
+test("a negative short amount puts the minus before the rupee sign", () => {
+  // Herbally IP's version printed "₹-8.21L" above a lakh but "-₹95,453" below it,
+  // so one refunds column had two shapes for a minus.
+  expect(formatMoneyShort("-820542")).toBe("-₹8.21L");
+  expect(formatMoneyShort("-12500000")).toBe("-₹1.25Cr");
+  expect(formatMoneyShort("-95453")).toBe("-₹95,453");
 });

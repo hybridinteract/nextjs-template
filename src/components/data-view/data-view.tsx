@@ -152,7 +152,9 @@ export function DataView<T>({
         searchPlaceholder={searchPlaceholder}
         leading={leading}
         actions={actions}
-        totalCount={total}
+        // No count until the list has answered. `total` is 0 while it loads and
+        // after it fails, and "0 widgets" is a wrong answer, not a missing one.
+        totalCount={coldLoad || error ? undefined : total}
         entityName={entityName}
       />
 

@@ -1,7 +1,7 @@
 # Data Fetching — TanStack Query
 
 > Read this before you add a query, change a `staleTime`, or debug stale data.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §4.
 
@@ -69,7 +69,7 @@ only when someone has actually complained about staleness.
 |---|---|
 | **No `refetchOnWindowFocus`** | Off globally. On a form-heavy internal app, alt-tabbing back and watching every list reload is noise, and it can stomp a half-filled dependent field. |
 | **No suspense queries** | They move the loading state into a boundary, which reads well in a demo and badly in a list page that wants a skeleton *inside* the table. `<DataView>` handles it explicitly instead. |
-| **No global `onError`** | Errors are surfaced per module by `handleError` in `hooks.ts`, because the useful message is domain-specific. See [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md). |
+| **No global `onError`** | Each mutation's `onError` calls `notify.fromError` with its own fallback, because the useful message is domain-specific. See [`05-mutations-and-toasts.md`](05-mutations-and-toasts.md). |
 | **No optimistic updates by default** | They are right for a one-click toggle and wrong for anything with server-side validation. Add them per action, deliberately. |
 
 ## 5. New module checklist
@@ -99,5 +99,7 @@ grep -rho "staleTime: [^,]*" src/ | sort | uniq -c | sort -rn
 #   query-provider.tsx  — the policy itself
 #   lib/auth/hooks.ts   — `retry: false` on /me. A failure there means "not
 #                         signed in"; retrying only delays the redirect.
-grep -rn "refetchOnWindowFocus\|retry:" src/
+# The e2e fixture turns retry off too, so its failed list fails at once. It is
+# test scaffolding, not app code, and is left out.
+grep -rn "refetchOnWindowFocus\|retry:" src/ | grep -v "/e2e-fixtures/"
 ```

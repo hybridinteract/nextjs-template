@@ -60,5 +60,9 @@ Every file ends with **How to re-check this doc** — the literal commands that 
 claims. Run them when you touch the topic. If a command disagrees with the file, the file is
 stale: fix it and update the date at the top.
 
+`npm run check:docs` lists every stamp older than 30 days, and fails on a missing stamp or a
+dead link. CI runs it. An old stamp is only a warning. It means "re-run my commands", not
+"I am wrong".
+
 That section is the only defence these documents have against quiet rot. A rules folder
 nobody verifies is worse than none, because people trust it.

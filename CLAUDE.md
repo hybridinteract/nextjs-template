@@ -18,17 +18,17 @@ framer-motion · lucide-react · big.js. Path alias `@/*` → `src/*`.
 npm run type-check && npm run lint && npm test && npm run build
 ```
 
-And before opening a PR, the browser suite: `npm run test:e2e`.
+And before opening a PR, the browser suite: `npm run test:e2e`. CI does not run it.
 
 `npm run lint` **is** clean. Keep it that way — this template starts with zero problems, and
 a baseline of "known failures" is how a lint run stops being read. Run it especially when you
 touch dates or numbers: the `no-restricted-syntax` rules in `eslint.config.mjs` are
 error-level and **only ESLint catches them** (tsc will not).
 
-**Not every section below applies to every project.** Six subsystems are optional and may
+**Not every section below applies to every project.** Eight parts are optional and may
 have been removed with `node ncube.js remove <feature>` — permissions, numeric, reference,
-blocking-loading, data-view, dark-mode. Check whether the folder exists before assuming a
-rule applies. See [`docs/OPTIONAL_PARTS.md`](docs/OPTIONAL_PARTS.md).
+blocking-loading, data-view, e2e, dark-mode, site. Check whether the folder exists before
+assuming a rule applies. See [`docs/OPTIONAL_PARTS.md`](docs/OPTIONAL_PARTS.md).
 
 Narrative overview: [`docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md`](docs/FRONTEND_ARCHITECTURE_GUIDE_V3.md).
 Doc index: [`docs/README.md`](docs/README.md).
@@ -106,11 +106,14 @@ folders stay flat, so URLs and permission strings do not change.
 - Writes wrap **`useBlockingMutation`** (`@/lib/loading`) with a `label`.
 - `invalidateQueries` goes **inside** the `mutationFn`, awaited before returning.
 - **Success toasts live in the hook's `onSuccess`.** Components `await mutateAsync()` then
-  close or reset — they do **not** toast success. Errors go through the module's
-  `handleError`.
+  close or reset — they do **not** toast success.
+- **Toast through `notify` (`@/lib/toast`), never `toast` from `sonner`.** ESLint blocks the
+  import. Errors are `notify.fromError(err, "Could not …")` in `onError`: it shows the
+  backend's message, and a retry replaces its last error instead of stacking. A partial
+  result is `notify.warning`.
 - **Exception — multi-step forms:** one user action firing several mutations emits **one
   aggregated** toast in the component, and those hooks stay silent on success.
-- `<Toaster>` is mounted once in `src/app/layout.tsx`; don't add another.
+- `<Toaster>` is mounted in `<AppProviders>` (`components/providers/app-providers.tsx`); don't add another.
 
 ## 6. Permissions
 
@@ -149,6 +152,11 @@ const { data, isLoading, isPending, error, refetch } = useOrders(dv.apiParams);
   when a page has two tables. Backend does the actual search/sort/paginate.
 - **Pass `isPending`, `error` and `onRetry` — all three.** Without them a failed list renders
   as an empty table ("there is no data"), and a slow one flashes the empty state.
+- Filter types: `select`, `multiselect`, `reference`, `daterange`, `numberrange`, `boolean`.
+  **A multi-select, reference or range filter needs `filters` passed to `useDataView` too**,
+  or `apiParams` sends the joined string. A multi-select or reference filter needs a backend
+  param that takes a list. Past four filters the Filters button opens a panel that applies in
+  one write. Applied filters show as removable pills.
 - `useSearchParams` needs dynamic rendering — already handled by
   `app/(dashboard)/dashboard/layout.tsx` exporting `dynamic = "force-dynamic"`.
 
@@ -162,22 +170,36 @@ const { data, isLoading, isPending, error, refetch } = useOrders(dv.apiParams);
   where hooks or interactivity are needed.
 - Detail/create/edit use the shared **`<Modal>`** (`@/components/ui/modal`): side panel on
   desktop / bottom sheet on mobile, with `size`, `tabs`, `mode` (view↔edit pencil),
-  `headerActions`, sticky `footer`. Read-only rows use `<DetailRow>`; form fields use
-  `<Field>`. Don't build bespoke dialogs.
+  `headerActions`, sticky `footer`. `placement="center"` opens it in the middle of a laptop
+  screen instead, for starting something new. Read-only rows use `<DetailRow>`; form fields
+  use `<Field>`. Don't build bespoke dialogs.
 - Reach for `@/components/shared` before writing a new control. **That barrel cannot be
   imported from a Server Component** — `lazy.tsx` calls `dynamic(…, { ssr: false })`. From a
   `page.tsx`, import by the component's own path.
+
+**Command palette.** Ctrl+K (⌘K on a Mac), or the search button in the sidebar, opens it. It
+lists `dashboardNavItems` after the permission filter, so a new page in the sidebar is in the
+palette with no extra work. It is also the only place to switch between light and dark.
 
 **Navigation config.** `app/(dashboard)/config.ts` is pure data — **zero JSX, zero hooks**. It
 owns `dashboardNavItems` (each with `permission`/`permissions` and a `group` label that sets
 the sidebar section) and the `ROUTES` constants. Import route strings from `ROUTES`; never
 inline `/dashboard/orders`.
 
-**Provider stack** (`app/layout.tsx`, outermost → innermost): `QueryProvider` →
-`ThemeProvider` → `{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog` →
-`<Toaster>`. Only add a provider here if it is **truly global**. Auth state syncs in
-`(dashboard)/layout.tsx`, not a global AuthProvider — that keeps unauthenticated pages from
-firing `/api/auth/me`.
+**Provider stack.** `app/layout.tsx` holds fonts, metadata and `ThemeProvider`, nothing else.
+`(auth)` and `(dashboard)` each mount `<AppProviders>`: `QueryProvider` → `<Toaster>` →
+`{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog`. **`<Toaster>` stays first**:
+mounted after the page, it misses every toast raised while the page mounts. `QueryProvider`
+keeps **one client per browser tab**, so the cache survives the move from sign-in to the
+dashboard. Only add a provider to the root layout if the public site needs it too. Auth
+state syncs in `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps
+unauthenticated pages from firing `/api/auth/me`.
+
+**Public site** (`app/(site)`): pages anyone can read without signing in, starting with `/`.
+It mounts **no providers**, so a visitor downloads no query client and no toaster. A public
+page that needs data or toasts mounts `<AppProviders>` in its own layout. A toast raised
+just before sign-in or sign-out moves you between groups is lost with the old toaster, so
+say it on the page you land on. No public site? `node ncube.js remove site`.
 
 **Blocking loading** (`@/lib/loading`): a Zustand store tracks concurrent blocking actions by
 token; `useBlockingMutation` owns the token lifecycle and `GlobalLoadingOverlay` renders the
@@ -197,6 +219,9 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 - **It must also clear that state**, via `useResetOnOpen(isOpen, reset)` (`@/lib/forms`), a
   seeding `openCreate()`, or `<Modal onDiscard>`: these panels stay mounted while closed, so
   otherwise "Discard" throws nothing away and the values are still there on the next open.
+- A wrapper that reads its record **before** rendering `<Modal>` (`if (!user) return null`,
+  or picking between two modals) makes the panel vanish instead of sliding out. Hold the
+  record with `useLastOpenValue(record, isOpen)` (`@/lib/forms`).
 - Autosave only where the record already exists and the form is long enough to earn it.
 
 ## 10. Styling — semantic tokens only
@@ -209,13 +234,21 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
   dark mode work.
   - ❌ `text-red-500`, `text-green-600`, `bg-gray-100`, `style={{ color: "#AA232B" }}`
   - ✅ `text-destructive`, `text-success`, `bg-muted`, `text-primary`
-  - The codebase is at **zero** raw-palette usages. **Keep it at zero.**
+  - ESLint blocks the raw palette, hex and made-up sizes (`text-[13px]`) in class names,
+    and a raw `<button>`/`<input>`/`<select>`/`<textarea>`/`<table>` outside the folders
+    that build parts. **Fix the lint error, never disable it.**
 - Status pills → `<StatusBadge label tone={…} />` (`neutral`/`success`/`warning`/`danger`/
   `info`/`brand`). Map domain status→tone in a small helper.
 - Compose classes with `cn()` (`@/lib/utils`). Use shadcn primitives — don't restyle native
   elements. Style buttons with `<Button variant size>`, never a class string. Icons:
   `lucide-react`, sized `size-4`/`size-3.5`.
 - Import order: external packages → `@/lib/*` → `@/components/*` → relative `./`.
+- Anything that portals takes its z-index from the ladder in `globals.css`
+  (`z-(--z-modal)` / `--z-dialog` / `--z-popper` / `--z-tooltip`), **never a bare `z-50`**.
+  A `<Select>` inside a `<Modal>` used to open behind it.
+- **Every shared part is on `/dashboard/design`** (`src/components/design/`). Copy from
+  there. A new part goes on it in the same change. The `build-ui` skill in `.claude/skills/`
+  says the same, for Claude.
 - **Rebrand by editing the token values in `:root` and `.dark`.** Nothing else.
 
 ## 11. TypeScript
@@ -233,15 +266,23 @@ already holds `activeTab`. Don't hand-roll `?tab=`.
 → [`docs/rules/12-dates-and-numbers.md`](docs/rules/12-dates-and-numbers.md)
 
 - **All date/time formatting goes through `@/lib/date-utils`** — `formatDate`,
-  `formatDateTime`, `formatTime`, `formatBusinessDate`, `todayString`, `toDateString`. Never
+  `formatDateTime`, `formatTime`, `formatBusinessDate` (and its short and long forms),
+  `formatTimeLeft`, `formatCountdown`, `todayString`, `toDateString`. Never
   `toLocaleDateString()/toLocaleString()/toLocaleTimeString()` (browser-locale **and**
   browser-timezone dependent) and never `new Date(ymd)` on a `YYYY-MM-DD` business date
   (parses as UTC midnight → off-by-one west of UTC). ESLint blocks both.
 - Pass an explicit zone: **`useDisplayTimeZone()`** for instants, **`useBusinessTimeZone()`**
   for business-date inputs.
+- A `<input type="datetime-local">` has no zone. Read it with
+  `instantFromZonedInput(value, timeZone)` and fill it with `zonedInputValue(instant,
+  timeZone)`, never `new Date(value)`, which reads it in the device's zone.
+- **The defaults are India**: `DEFAULT_TIME_ZONE = "Asia/Kolkata"`, a 12-hour clock,
+  `NUMBER_LOCALE = "en-IN"` (₹12,75,000) and `DEFAULT_CURRENCY = "INR"`. Change them once, in
+  `date-utils.ts` and `numeric/`, for a project outside India. Never per call site.
 - **All money and quantity formatting goes through `@/lib/numeric`.** Values are decimal
   **strings**; arithmetic uses `big.js` (`toBig`, `sumMoney`, `lineTotal`). Never
-  `Intl.NumberFormat` at a call site.
+  `Intl.NumberFormat` at a call site. `formatMoneyShort` gives ₹8.21L and ₹1.25Cr for a
+  tile with no room. Never on a bill.
 - Quantities are stored at 3 dp, so the padding is storage, not information — render a raw
   wire string and you get `1990.000`. Use `formatQuantity` for **display**, and
   `toBig(x).toString()` when seeding an editable `type="number"` input.
@@ -303,7 +344,7 @@ navigation, jsdom cannot see it and it belongs in Playwright.**
 - In Playwright, query only visible elements — `DataTable` renders both layouts and lets CSS
   choose, so a bare `.first()` can resolve to a hidden node. Use `visibleText()` from
   `e2e/fixtures/helpers.ts`.
-- The e2e suite runs with **no backend** (`e2e/fixtures/mock-api.mjs`). Keep it that way.
+- The e2e suite runs with **no backend** (`scripts/mock-api.mjs`). Keep it that way.
 - Don't add a third runner.
 
 ## 17. PWA & offline
@@ -322,36 +363,11 @@ navigation, jsdom cannot see it and it belongs in Playwright.**
 
 ---
 
-## Anti-patterns — do NOT do these
+## Anti-patterns — an index
 
-Each line is a violation of the section in brackets; go there for the fix.
-
-1. Calling `fetch`/`apiClient` from a component. [§1]
-2. snake_case leaking into components, or camelCase in payloads. [§2]
-3. Raw colour classes or inline hex (`text-red-500`, `#AA232B`). [§10]
-4. Hand-rolled list state (`useState` for page/search/filters) on a table page. [§7]
-5. Toasting success in both the hook and the component. [§5]
-6. Plain `useMutation` for a write, or invalidating outside the `mutationFn`. [§5]
-7. A one-off dialog instead of `<Modal>`, or a raw `<input>`/`<button>` instead of the shadcn
-   primitives. [§8]
-8. Importing another domain's internals (`@/lib/x/api`) or a deep component path. [§1]
-9. Hardcoding role names, or treating `usePermission` as a security boundary. [§6]
-10. Populating a picker or a filter from a gated module list hook. [§13]
-11. Float math on a money string, or casting a raw backend enum string without `asEnum`. [§2, §12]
-12. `toLocale*String()` on a date, or `new Date(ymd)` on a `YYYY-MM-DD` business date. [§12]
-13. Rendering a raw quantity wire string (`{item.currentQty}` → `1990.000`). [§12]
-14. `"use client"` on a page, or on a component that needs no interactivity. [§8]
-15. Building a download link by hand instead of using `@/lib/utilities`. [§14]
-16. A modal with typed input and no `isDirty`, or a dirty-check written against empty instead
-    of against the state the form opened with. [§9]
-17. A guarded modal that never clears its form — "Discard" that leaves the values sitting
-    there for the next open. [§9]
-18. A `<DataView>` without `error`, `onRetry` and `isPending`. [§7]
-19. Server data copied into a Zustand store. [§4]
-20. `window.location.href` to recover from a failed request. [§15]
-21. Adding a field to the reference-option shape. [§13]
-22. `any`, or a literal union widened with `| string`. [§11]
-23. A service worker that caches an authenticated response. [§17]
+Each section above states its own don'ts. By topic: data flow §1–§4 · writes and toasts §5 ·
+permissions §6, §13 · lists §7 · components and modals §8–§9 · colour §10 · types §11 · dates
+and money §12 · downloads §14 · failures §15 · tests §16 · offline §17.
 
 ## New-feature checklist
 
@@ -363,4 +379,7 @@ route in `config.ts` and the keys in `lib/permissions/` → tests for anything w
 failure mode → `npm run type-check && npm run lint && npm test && npm run build` all clean,
 and `npm run test:e2e` before the PR.
 
-`node ncube.js startdomain <Name>` scaffolds the whole shape.
+`node ncube.js startdomain <Name>` scaffolds the whole shape, registration included, and
+`npm run test:generator` proves its output passes type-check and lint. Change the generator
+and that test together. `npm run dev:mock` runs the app against a fake backend that accepts
+any login.

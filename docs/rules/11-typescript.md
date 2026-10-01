@@ -1,7 +1,7 @@
 # TypeScript
 
 > Read this before you reach for `any`, or write a type by hand.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §11.
 
@@ -42,19 +42,21 @@ const STATUS_TONE: Record<OrderStatus, StatusTone> = {
 `Record<OrderStatus, …>` is the quiet win: add a status to the array and every map keyed on
 it fails to compile until you handle the new case.
 
-**Narrowing an unknown error:**
+**Narrowing an unknown error**, from `lib/toast.ts`, where a caught error becomes words:
 
 ```ts
-function handleError(err: unknown) {
-  const message = err instanceof AppError ? err.message : "Something went wrong";
-  toast.error(message);
+export function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof AppError) return err.message;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 ```
 
 Key settings in `tsconfig.json`: `strict`, `noEmit`, `moduleResolution: "bundler"`,
-`jsx: "react-jsx"`, and `paths: { "@/*": ["./src/*"] }`. `**/*.test.ts` is excluded because
-the test files use explicit `.ts` import specifiers, which `tsc` refuses without
-`allowImportingTsExtensions`; Node's runner resolves them natively.
+`jsx: "react-jsx"`, and `paths: { "@/*": ["./src/*"] }`. Test files are type-checked with
+everything else. Vitest strips types without checking them, so `npm run type-check` is the
+only thing that catches a type error in a test. Until 30 Sep 2026 `*.test.ts` was excluded,
+a leftover from when Node's own runner ran the tests.
 
 ## 4. Deliberately not done
 

@@ -1,7 +1,7 @@
 # Files & Downloads
 
 > Read this before you make the browser save something.
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §14.
 

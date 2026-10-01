@@ -1,10 +1,10 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { AppError } from "@/types";
 import { useBlockingMutation } from "@/lib/loading";
+import { notify } from "@/lib/toast";
+import { useSessionStore } from "./session-store";
 import * as authApi from "./api";
 import type { LoginFormValues } from "./types";
 
@@ -37,6 +37,9 @@ export function useLogin() {
   return useMutation({
     mutationFn: (values: LoginFormValues) => authApi.login(values),
     onSuccess: async () => {
+      // A new session exists, so the last one's sign-out flag ends here. Not on
+      // the login page mounting, where the old dashboard's 401s can still land.
+      useSessionStore.getState().reset();
       // Fetch, not invalidate. Nothing observes /me on the login page, so
       // invalidation marks it stale and fetches nothing — the dashboard layout
       // would then mount with no user, seed an empty role store, and render a
@@ -49,10 +52,7 @@ export function useLogin() {
       });
       router.push("/dashboard");
     },
-    onError: (err) => {
-      const message = err instanceof AppError ? err.message : err instanceof Error ? err.message : "Login failed";
-      toast.error(message);
-    },
+    onError: (err) => notify.fromError(err, "Login failed"),
   });
 }
 
@@ -63,18 +63,18 @@ export function useLogout() {
   return useBlockingMutation(
     {
       mutationFn: authApi.logout,
+      // Before the request, not after it. Once the cookies are gone, any query
+      // that refetches gets a 401, and without this flag each one raises "your
+      // session has ended" at someone who chose to leave. See session-store.ts.
+      onMutate: () => useSessionStore.getState().beginSignOut(),
       onSuccess: () => {
         queryClient.clear();
         router.push("/login");
       },
       onError: (err) => {
-        const message =
-          err instanceof AppError
-            ? err.message
-            : err instanceof Error
-              ? err.message
-              : "Logout failed";
-        toast.error(message);
+        // Still signed in, so a real expiry later must still raise the dialog.
+        useSessionStore.getState().cancelSignOut();
+        notify.fromError(err, "Logout failed");
       },
     },
     { source: "auth", label: "Signing out…" },

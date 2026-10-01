@@ -1,7 +1,7 @@
 # Components & Routing
 
-> Read this before you add a page, a route, or a dialog.
-> Last verified against the code: 19 Aug 2026.
+> Read this before you add a page, a route, a dialog, or a provider.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §8.
 
@@ -21,7 +21,8 @@ page component that carries the directive drags its whole subtree in with it.
 - Add `"use client"` **only** where hooks or interactivity are needed.
 - `page.tsx`: `export const metadata`, `<PageLayout>`, mount `<XView />`. Nothing else.
 - Detail, create and edit use the shared `<Modal>` (`@/components/ui/modal`). Do not build
-  a bespoke dialog.
+  a bespoke dialog. `placement="center"` opens it in the middle of a laptop screen, for
+  starting something new. A phone always gets the bottom sheet.
 - Read-only rows use `<DetailRow>`; form fields use `<Field>` — both from
   `@/components/shared`.
 - Reach for the shared barrel before writing a new control.
@@ -33,12 +34,17 @@ page component that carries the directive drags its whole subtree in with it.
 
 ```
 src/app/
-  layout.tsx                       root: fonts, providers, global surfaces
+  layout.tsx                       root: fonts, metadata, the theme. Nothing else.
   error.tsx / global-error.tsx / not-found.tsx
-  (auth)/login/page.tsx            unauthenticated
+  (site)/                          public, no providers
+    layout.tsx                     header and footer
+    page.tsx                       the home page, at "/"
+  (auth)/
+    layout.tsx                     mounts <AppProviders>, noindex
+    login/page.tsx                 unauthenticated
   (dashboard)/
     config.ts                      nav items + ROUTES. Pure data.
-    layout.tsx                     seeds auth + role stores, renders the shell
+    layout.tsx                     mounts <AppProviders>, seeds auth + role stores, renders the shell
     dashboard/
       layout.tsx                   export const dynamic = "force-dynamic"
       error.tsx                    keeps the shell alive when a page crashes
@@ -46,13 +52,62 @@ src/app/
       <domain>/loading.tsx         route skeleton
 ```
 
-**Provider stack** (`app/layout.tsx`, outermost → innermost): `QueryProvider` →
-`ThemeProvider` → `{children}` → `GlobalLoadingOverlay` → `SessionExpiredDialog` →
-`<Toaster>`. Only add a provider here if it is **truly global**; a feature-scoped provider
-belongs in that feature's `layout.tsx`.
+**Provider stack.** The root layout holds `ThemeProvider` and nothing else. `(auth)` and
+`(dashboard)` each mount `<AppProviders>` (`components/providers/app-providers.tsx`):
+`QueryProvider` → `<Toaster>` → `{children}` → `GlobalLoadingOverlay` →
+`SessionExpiredDialog`. Only add a provider to the root layout if the public site needs it
+too. One the signed-in half needs goes in `AppProviders`. A feature-scoped one goes in
+that feature's `layout.tsx`.
+
+**Why the split.** Until 30 Sep 2026 all of it sat in the root layout, and a public page
+would have downloaded all of it for nothing. Measured on a production build, the home
+page loads 181KB of script gzipped, against 214KB with the providers in the root layout.
+The theme stays in the root: its class has to be on `<html>` before the first paint, or
+the page flashes the wrong theme.
+
+**One query client per browser tab.** Moving from `/login` to `/dashboard` unmounts the
+`(auth)` layout and mounts the `(dashboard)` one, and with them their `QueryProvider`s.
+`useLogin` fetches `/me` just before that move, so the sidebar draws its menu on the first
+paint. With a client per mount, that fetch went into a cache that was then thrown away, and
+the dashboard fetched `/me` again. So `QueryProvider` makes one client per tab in the
+browser, and a new one per request on the server, where sharing would hand one person's
+data to the next. Influen split its providers the same way on a client per mount, and its
+sign-in has this bug. `e2e/auth.spec.ts` counts the `/me` calls.
+
+**The toaster does not survive the move.** Each group's `AppProviders` has its own
+`<Toaster>`. A toast raised just before sign-in or sign-out changes group goes with the
+old one. Say it on the page you land on, as Influen's `?signedOut=1` notice does.
+
+**`<Toaster>` is first on purpose.** React runs an earlier sibling's effects before a later
+one's, and sonner's Toaster only shows toasts raised after its own effect subscribes. It
+used to be last, so a toast raised while a page mounted went nowhere. Influen found it when
+its "you're signed out" notice on the login page never appeared. Toasts from a click or a
+mutation were never affected, which is why nobody noticed. It sets its own z-index, so its
+DOM position does not change what is on top.
+
+**The Modal is a dialog to a screen reader.** The panel has `role="dialog"` and is named by
+its title. It has no `aria-modal`: the Select lists and popovers inside it portal to
+`<body>`, outside the panel, and `aria-modal` says everything outside is out of reach.
+
+**Escape closes the top layer only.** A Radix layer inside the panel (a Select's list, a
+popover, an AlertDialog) closes itself on Escape and marks the key handled, and the Modal
+then ignores that key. Until 30 Sep 2026 the Modal closed as well, so backing out of a
+dropdown threw the whole panel away.
 
 Auth state is seeded in `(dashboard)/layout.tsx`, not a global AuthProvider — that keeps
-unauthenticated pages from firing `/api/auth/me`.
+unauthenticated pages from firing `/api/auth/me`. The layout renders `<AppProviders>` and
+does the seeding in a child, `DashboardFrame`, because `useMe` needs the query client
+above it.
+
+**The public site** (`app/(site)`) is pages anyone can read without signing in. The
+template ships a placeholder home page at `/` and a plain header and footer. Replace
+them with the product's own. It mounts no providers. A public page that needs data or
+toasts, a contact form say, mounts `<AppProviders>` in its own layout. Its "Sign in" link
+suits someone already signed in too, because the proxy sends them from `/login` straight
+to the dashboard. Checking the cookie in the header instead would make every public page
+render per request. The `(auth)` layout marks every sign-in page `noindex`, so search
+engines that follow that link never list it. An app with no public site runs
+`node ncube.js remove site`, and `/` goes to the dashboard again.
 
 **`dynamic = "force-dynamic"`** on `dashboard/layout.tsx` is required: `useSearchParams`,
 which `useDataView` and `useTabState` both read, cannot run during static prerendering.
@@ -72,6 +127,8 @@ eight modules a flat list stops being scannable.
 | **No Server Actions for writes** | Same reason. Mutations go through `useBlockingMutation` so they share one overlay, one toast policy and one invalidation contract. |
 | **`@/components/shared` cannot be imported from a Server Component** | Its barrel pulls in `lazy.tsx`, which calls `dynamic(..., { ssr: false })`. From a `page.tsx`, import the component by its own path. The build error points at `lazy.tsx`, not at your import, so this is worth remembering. |
 | **No route-level permission checks** | See [`06-permissions.md`](06-permissions.md) §4. |
+| **No `robots.txt`** | Nothing public needs hiding. The dashboard sits behind the proxy, and the sign-in pages carry `noindex`, which does more than a `robots.txt` block: a blocked page is never fetched, so its `noindex` is never read, and its address can still be listed. Herbally IP has one. Add it when there is something public to keep out. |
+| **No signed-in state in the public header** | Knowing needs the cookie, and reading it makes every public page render per request. "Sign in" already takes a signed-in person to the dashboard. |
 
 ## 5. New module checklist
 
@@ -96,6 +153,12 @@ grep -rn "\"/dashboard/" src/components/
 ```bash
 # JSX or hooks in the nav config. Expect zero.
 grep -nE "use[A-Z]|<[A-Z]" "src/app/(dashboard)/config.ts"
+```
+
+```bash
+# Query, toasts or the overlay in the root layout. Expect zero: they belong in
+# AppProviders, or every public page downloads them.
+grep -nE "QueryProvider|Toaster|GlobalLoadingOverlay|SessionExpiredDialog" src/app/layout.tsx
 ```
 
 ```bash

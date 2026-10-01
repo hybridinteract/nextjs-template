@@ -1,7 +1,7 @@
 # Mutations, Toasts & the Loading Overlay
 
 > Read this before you add a write, or make anything say "Saved".
-> Last verified against the code: 19 Aug 2026.
+> Last verified against the code: 30 Sep 2026.
 
 Guardrail: [`../../CLAUDE.md`](../../CLAUDE.md) §5.
 
@@ -25,12 +25,19 @@ which is to say: only for the customer.
   the overlay drops before the list has refreshed and the user sees stale rows.
 - **Success toasts live in the hook's `onSuccess`.** Components `await mutateAsync()` then
   close or reset. They do **not** toast success.
-- Errors go through the module's `handleError` → `toast.error`.
+- **Toast through `notify` (`@/lib/toast`), never `toast` from `sonner`.** ESLint blocks
+  the import. `notify` sets how long each kind stays up, and makes a retried write replace
+  its last error instead of stacking three identical ones.
+- Errors are `notify.fromError(err, "Could not …")` in the mutation's `onError`. A partial
+  result is `notify.warning`. "Nothing to save" is `notify.info`.
 - **Exception — multi-step forms.** One user action that fires several mutations (entity +
   photo + documents) emits **one aggregated** toast in the component, and those
   building-block hooks stay silent on success.
-- Inline validation errors stay inline. `<Toaster>` is mounted once in
-  `src/app/layout.tsx`; do not add another.
+- Inline validation errors stay inline. `<Toaster>` is mounted once, in `<AppProviders>`
+  (`components/providers/app-providers.tsx`); do not add another. The `(auth)` and
+  `(dashboard)` layouts each mount that, so a toast raised just before sign-in or
+  sign-out changes group is lost. Say it on the page you land on. The public site has no
+  toaster at all. See rule 08.
 
 ## 3. How it works here
 
@@ -44,8 +51,8 @@ export function useCreateOrder() {
         await queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
         return result;
       },
-      onSuccess: () => toast.success("Order created"),
-      onError: handleError,
+      onSuccess: () => notify.success("Order created"),
+      onError: (err) => notify.fromError(err, "Could not create the order"),
     },
     { source: "mutation", label: "Creating order…" },
   );
@@ -54,6 +61,7 @@ export function useCreateOrder() {
 
 | File | Responsibility |
 |---|---|
+| `src/lib/toast.ts` | `notify`, the only place anything raises a toast. Durations, error wording, no stacking. |
 | `src/lib/loading/store.ts` | A Zustand store tracking concurrent blocking actions by token. |
 | `src/lib/loading/mutation.ts` | `useBlockingMutation` — owns the token lifecycle. |
 | `src/lib/loading/types.ts` | `BlockingLoadSource`: `"auth" \| "route" \| "mutation" \| "upload" \| "custom"`. |
@@ -62,20 +70,35 @@ export function useCreateOrder() {
 The store is keyed by token, not a boolean, so two overlapping writes do not lower the
 overlay when the first one finishes.
 
+### What `notify` gives you
+
+| Call | For |
+|---|---|
+| `notify.success("Order created")` | A write that did what it said. 4 seconds. |
+| `notify.fromError(err, "Could not create the order")` | A mutation's `onError`. Shows the backend's message when there is one, the fallback when not. A retry replaces the last card. 8 seconds. |
+| `notify.error("…")` | An error you already have the words for. 8 seconds. |
+| `notify.warning("Updated 12, 1 skipped.")` | A partial result. 6 seconds. |
+| `notify.info("No changes to save")` | Something happened, and nothing changed. 5 seconds. |
+| `notify.dismiss(id)` | Close one, or all of them. |
+
+An error stays twice as long as a success because it is news, often a sentence long, and
+the one people read twice.
+
 ## 4. Deliberately not done
 
 | Not done | Why |
 |---|---|
 | **The overlay is not used for one-click toggles** | A full-screen block for "mark as read" is heavier than the action. Those want an optimistic update instead — but make that call per action, not as a blanket policy. |
 | **No toast on login** | The navigation is the acknowledgement. A toast fired there rides through the transition and lands on the next page looking orphaned. |
+| **No `notify.promise` or `notify.loading`** | Pending state belongs to `useBlockingMutation` and its overlay. A second spinner in the corner is how one save announces itself twice. |
 | **No `onSettled` invalidation** | Invalidating in `onSettled` runs on failure too, which refetches to prove nothing changed. |
 
 ## 5. New module checklist
 
 1. Every mutation hook wraps `useBlockingMutation` with a human `label`.
 2. Invalidate inside `mutationFn`, awaited.
-3. One `toast.success` per user action, in the hook.
-4. One `handleError` per module, used by every mutation in it.
+3. One `notify.success` per user action, in the hook.
+4. Every `onError` is `notify.fromError(err, "Could not …")`. No per-module error helper.
 
 ## 6. How to re-check this doc
 
@@ -90,11 +113,17 @@ grep -rn "return useMutation(" src/lib/ | grep -v "loading/mutation.ts"
 # Duplicate success toasts — a component announcing what the hook already
 # announced. Expect exactly one file: `data-view/bulk-action-bar.tsx`, which is
 # the aggregated-toast exception — one bulk action fans out to many writes and
-# reports a single outcome ("12 updated, 1 failed").
-grep -rln "toast.success" src/components/
+# reports a single outcome ("12 updated, 1 skipped").
+grep -rln "notify.success" src/components/
 ```
 
 ```bash
-# A second Toaster. Expect exactly one, in app/layout.tsx.
+# A second Toaster. Expect exactly one, in components/providers/app-providers.tsx.
 grep -rn "<Toaster" src/
+```
+
+```bash
+# A toast that skipped notify. Expect nothing: ESLint blocks the import, and
+# this catches an eslint-disable. src/lib/toast.ts is the one allowed file.
+grep -rn "import { toast" src/ | grep sonner | grep -v "src/lib/toast.ts"
 ```

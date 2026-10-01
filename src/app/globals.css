@@ -45,6 +45,27 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ── Stacking order ────────────────────────────────────────────────────────── */
+/* Every layer that portals to `document.body` competes in the root stacking
+   context, so these numbers decide who is on top. They are not theme tokens and
+   have no dark variant.
+
+   The rule: a layer opened from inside another layer sits above it. Radix's
+   Portal is a plain unpositioned <div>, so a popper does not inherit a stacking
+   context from the panel it opened from. It competes with it directly. Stock
+   shadcn puts every overlay at z-50. When <Modal> sat at z-[100], a <Select>
+   inside it opened behind the panel and looked dead. e2e/modal.spec.ts guards it.
+
+   Anything new that portals goes on this ladder, never a bare z-50. Above it sit
+   the two layers that must cover an open modal: the blocking overlay (z-[9999])
+   and sonner's toaster, which sets its own z-index. */
+:root {
+  --z-modal: 100;
+  --z-dialog: 110;
+  --z-popper: 120;
+  --z-tooltip: 130;
+}
+
 /* ── Light mode tokens ─────────────────────────────────────────────────────── */
 /* Customize these for your brand. Default: zinc/neutral palette.              */
 :root {

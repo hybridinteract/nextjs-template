@@ -1,10 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
-import { QueryProvider } from "@/components/providers/query-provider";
-import { GlobalLoadingOverlay } from "@/components/loading/global-loading-overlay";
-import { SessionExpiredDialog } from "@/components/auth/session-expired-dialog";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -49,6 +45,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Fonts, metadata and the providers every route needs. Nothing else.
+ *
+ * Query, toasts, the loading overlay and the session dialog are not here. The
+ * (auth) and (dashboard) layouts mount them through <AppProviders>, so the public
+ * site never downloads them. See components/providers/app-providers.tsx.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -57,19 +60,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-            <GlobalLoadingOverlay />
-            <SessionExpiredDialog />
-            <Toaster richColors position="top-right" />
-          </ThemeProvider>
-        </QueryProvider>
+        {/* Here, not in a group's layout, because the public site needs it
+            too. Its class has to be on <html> before the first paint, or the
+            page flashes the wrong theme. */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 import { AppError } from "@/types";
 import { useSessionStore } from "@/lib/auth/session-store";
+import { detailToMessage } from "@/lib/backend-error";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface RequestOptions {
@@ -53,29 +54,20 @@ async function parseError(response: Response): Promise<AppError> {
     body = null;
   }
 
-  // Flatten FastAPI 422 validation errors: [{ msg, loc }] → "field: message"
-  if (
-    response.status === 422 &&
-    body &&
-    typeof body === "object" &&
-    "detail" in body &&
-    Array.isArray((body as { detail: unknown }).detail)
-  ) {
-    const detail = (body as { detail: Array<{ msg: string; loc: string[] }> }).detail;
-    const message = detail
-      .map((issue) => `${issue.loc.at(-1) ?? "field"}: ${issue.msg}`)
-      .join("; ");
+  const detail =
+    body && typeof body === "object" && "detail" in body
+      ? (body as { detail: unknown }).detail
+      : undefined;
+
+  // A string, a 422 issue list, or an object with a `message`: all three become
+  // a sentence. Reading only strings turned the object shape into a status code.
+  const message =
+    detailToMessage(detail) ?? `Request failed with status ${response.status}`;
+
+  // A 422 keeps its issue list as `detail`, so a form can map issues to fields.
+  if (response.status === 422 && Array.isArray(detail)) {
     return new AppError(message, 422, detail, body);
   }
-
-  const message =
-    body &&
-    typeof body === "object" &&
-    "detail" in body &&
-    typeof (body as { detail: unknown }).detail === "string"
-      ? (body as { detail: string }).detail
-      : `Request failed with status ${response.status}`;
-
   return new AppError(message, response.status, body, body);
 }
 
